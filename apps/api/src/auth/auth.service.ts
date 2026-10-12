@@ -128,11 +128,16 @@ export class AuthService {
     });
 
     // Ensure demo/tenant data + SUPER_ADMIN role exist before linking the HR user
+    let seedInfo: { ok: true; agencyId: string; payments: number } | { ok: false; error: string };
     try {
       await this.seedBootstrap.ensureSeeded();
+      const agency = await this.prisma.agency.findUnique({ where: { code: 'NCS' } });
+      const payments = agency
+        ? await this.prisma.payment.count({ where: { agencyId: agency.id } })
+        : 0;
+      seedInfo = { ok: true, agencyId: agency?.id ?? '', payments };
     } catch (err) {
-      // Don't block SSO login if seed fails; dashboard may stay empty until seed succeeds
-      console.error('[hr-sso] seed ensure failed', (err as Error).message);
+      seedInfo = { ok: false, error: (err as Error).message };
     }
 
     const user = await this.upsertHrSsoUser(staff);
@@ -176,6 +181,7 @@ export class AuthService {
         from: dto.from ?? null,
         profile: staff.raw,
       },
+      seed: seedInfo,
     };
   }
 
