@@ -1,6 +1,6 @@
-# Railway Config as Code — API service
-# In Railway: Settings → Config-as-code path → /apps/api/railway.toml
-# Keep service Root Directory at repo root (/) so monorepo packages resolve.
+# Railway Config as Code — API (NestJS)
+# In Railway service Settings → Config-as-code path → /apps/api/railway.toml
+# Root Directory must stay at repo root (/).
 
 [build]
 builder = "DOCKERFILE"
@@ -10,8 +10,10 @@ watchPatterns = [
   "packages/**",
   "infra/docker/Dockerfile.api",
   "infra/docker/api-entrypoint.sh",
+  "scripts/railway-start.cjs",
   "pnpm-lock.yaml",
-  "package.json"
+  "package.json",
+  "apps/api/railway.toml"
 ]
 
 [deploy]

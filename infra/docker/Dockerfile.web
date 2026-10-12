@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# Railway Web service (admin + /pay). Root Directory = repo root.
+# Config-as-code: /apps/web/railway.toml
 FROM node:20-bookworm-slim AS base
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
@@ -13,12 +15,17 @@ COPY packages/config/package.json ./packages/config/package.json
 COPY packages/database/package.json ./packages/database/package.json
 COPY tests/package.json ./tests/package.json
 COPY apps/web ./apps/web
-RUN pnpm install --frozen-lockfile --filter @revenue/web... || pnpm install --filter @revenue/web...
+RUN mkdir -p apps/web/public \
+  && (pnpm install --frozen-lockfile --filter @revenue/web... || pnpm install --filter @revenue/web...)
 
 FROM deps AS build
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-RUN pnpm --filter @revenue/web build
+# Railway injects service variables as ENV during build — also accept classic ARG
+ARG NEXT_PUBLIC_API_URL=https://revenue-backend-production-9be7.up.railway.app/api/v1
+ARG NEXT_PUBLIC_AUTO_LOGIN=true
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_AUTO_LOGIN=${NEXT_PUBLIC_AUTO_LOGIN}
+RUN echo "Building web with NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" \
+  && pnpm --filter @revenue/web build
 
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
@@ -29,4 +36,5 @@ COPY --from=build /app/apps/web/public ./apps/web/public
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 EXPOSE 3000
+# Next standalone in this monorepo emits apps/web/server.js
 CMD ["node", "apps/web/server.js"]

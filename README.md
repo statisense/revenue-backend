@@ -7,8 +7,7 @@ Single-tenant **Nigeria Customs (NCS)** revenue collection system: assessment â
 | Layer | Technology |
 |-------|------------|
 | API | NestJS modular monolith (`apps/api`) |
-| Admin | Next.js (`apps/web`) :3000 |
-| Pay portal | Next.js (`apps/pay`) :3001 |
+| Admin + Pay | Next.js (`apps/web`) :3000 — pay portal at `/pay` |
 | Database | **MySQL 8** + Prisma |
 | Queue | Redis + BullMQ, RabbitMQ |
 | Gateways | Paystack, Flutterwave, Remita |
@@ -50,7 +49,6 @@ pnpm db:seed
 
 pnpm --filter @revenue/api dev
 pnpm --filter @revenue/web dev
-pnpm --filter @revenue/pay dev
 ```
 
 - Swagger: http://localhost:4000/docs  
@@ -58,6 +56,19 @@ pnpm --filter @revenue/pay dev
 - Pay (public, no login): http://localhost:3000/pay  
 
 `apps/pay` is deprecated; the pay portal is part of `@revenue/web`.
+
+## Railway (production fullstack)
+
+You need **two** services from this repo — API alone is not the full app.
+
+See **[`docs/railway.md`](docs/railway.md)** and **[`.env.railway.example`](./.env.railway.example)**.
+
+| Service | Config-as-code |
+|---------|----------------|
+| `revenue-backend` | `/apps/api/railway.toml` |
+| `revenue-web` | `/apps/web/railway.toml` |
+
+Plus MySQL, Redis, and RabbitMQ plugins/services.
 
 ## Seed users (password `ChangeMe@12345`)
 

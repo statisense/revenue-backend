@@ -5,6 +5,7 @@ dist
 coverage
 .env
 .env.local
+docs/railway-variables.txt
 *.log
 .DS_Store
 uploads

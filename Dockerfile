@@ -1,5 +1,7 @@
-# Root Dockerfile — same as API image (Railway may auto-detect /Dockerfile)
-# Prefer config-as-code: infra/docker/Dockerfile.api via railway.toml
+# Root Dockerfile mirrors the API image for services that still point at /Dockerfile.
+# Prefer Config-as-code:
+#   API → /apps/api/railway.toml  (infra/docker/Dockerfile.api)
+#   Web → /apps/web/railway.toml  (infra/docker/Dockerfile.web)
 # syntax=docker/dockerfile:1
 FROM node:20-bookworm-slim AS base
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate \

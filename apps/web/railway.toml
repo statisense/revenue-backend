@@ -1,6 +1,6 @@
-# Railway Config as Code — Admin web (Next.js)
-# In Railway: Settings → Config-as-code path → /apps/web/railway.toml
-# Keep Root Directory at repo root (/).
+# Railway Config as Code — Web (Next.js admin + public pay portal)
+# In Railway service Settings → Config-as-code path → /apps/web/railway.toml
+# Root Directory must stay at repo root (/).
 
 [build]
 builder = "DOCKERFILE"
@@ -9,11 +9,12 @@ watchPatterns = [
   "apps/web/**",
   "infra/docker/Dockerfile.web",
   "pnpm-lock.yaml",
-  "package.json"
+  "package.json",
+  "apps/web/railway.toml"
 ]
 
 [deploy]
 healthcheckPath = "/"
-healthcheckTimeout = 120
+healthcheckTimeout = 180
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5

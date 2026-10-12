@@ -8,8 +8,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "pnpm --filter @revenue/shared build && pnpm --filter @revenue/config build && pnpm --filter @revenue/database generate && pnpm --filter @revenue/database build && pnpm --filter @revenue/api build",
-    "start": "node scripts/railway-start.cjs",
+    "build": "turbo run build",
+    "build:api": "pnpm --filter @revenue/shared build && pnpm --filter @revenue/config build && pnpm --filter @revenue/database generate && pnpm --filter @revenue/database build && pnpm --filter @revenue/api build",
+    "build:web": "pnpm --filter @revenue/web build",
+    "start": "node -e \"console.error('This monorepo is not a single Railway service. Deploy revenue-backend (/apps/api/railway.toml) and revenue-web (/apps/web/railway.toml). See docs/railway.md'); process.exit(1)\"",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "test": "turbo run test",
