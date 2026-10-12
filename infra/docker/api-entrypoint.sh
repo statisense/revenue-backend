@@ -153,5 +153,11 @@ if ! pnpm --filter @revenue/database exec prisma migrate deploy; then
   exec node /app/scripts/railway-start.cjs
 fi
 
+# Optional first-boot seed (set SEED_ON_BOOT=true once on Railway, then remove)
+if [ "${SEED_ON_BOOT:-}" = "true" ] || [ "${SEED_ON_BOOT:-}" = "1" ]; then
+  echo "SEED_ON_BOOT enabled — seeding database..."
+  pnpm --filter @revenue/database seed || echo "Seed failed (non-fatal)"
+fi
+
 echo "Starting API on port ${PORT:-4000}... (QUEUES_DISABLED=${QUEUES_DISABLED:-0})"
 exec node apps/api/dist/main.js
