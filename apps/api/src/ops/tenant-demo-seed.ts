@@ -263,7 +263,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
           amountMinor: row.amount,
           currency: 'NGN',
           status: PaymentStatus.PAID,
-          method: PaymentMethod.CARD,
+          method: PaymentMethod.DEBIT_CARD,
           paidAt: row.paidAt,
           payerName: 'Demo Shipping Ltd',
           payerEmail: 'payer@example.com',
