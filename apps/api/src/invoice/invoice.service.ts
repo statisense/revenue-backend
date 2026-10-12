@@ -200,11 +200,11 @@ export class InvoiceService {
   }
 
   async list(actor: AuthUser, agencyId?: string) {
-    const resolved = this.abac.resolveAgencyId(actor, agencyId);
+    const resolved = await this.abac.resolveAgencyIdAsync(actor, agencyId);
     return this.prisma.invoice.findMany({
       where: { agencyId: resolved },
       include: {
-        lines: true,
+        lines: { include: { revenueType: true, taxType: true } },
         paymentRequests: { include: { virtualAccount: true, paymentLink: true } },
       },
       orderBy: { createdAt: 'desc' },

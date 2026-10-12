@@ -167,6 +167,33 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<{
     skipDuplicates: true,
   });
 
+  await prisma.taxType.upsert({
+    where: { id: 'ncs-tax-vat' },
+    update: { ratePercent: 7.5, name: 'VAT', isActive: true, agencyId },
+    create: {
+      id: 'ncs-tax-vat',
+      agencyId,
+      code: 'VAT',
+      name: 'Value Added Tax',
+      description: 'Federal VAT',
+      ratePercent: 7.5,
+      isActive: true,
+    },
+  });
+  await prisma.taxType.upsert({
+    where: { id: 'ncs-tax-wht' },
+    update: { ratePercent: 5, name: 'WHT', isActive: true, agencyId },
+    create: {
+      id: 'ncs-tax-wht',
+      agencyId,
+      code: 'WHT',
+      name: 'Withholding Tax',
+      description: 'Withholding tax on services',
+      ratePercent: 5,
+      isActive: true,
+    },
+  });
+
   const now = new Date();
   const today = new Date(now);
   today.setHours(10, 0, 0, 0);

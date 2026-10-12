@@ -3,6 +3,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { PrismaService } from '../prisma/prisma.service';
 import { seedTenantDemoData } from './tenant-demo-seed';
+import { patchRevenueSchema } from './schema-patch';
 
 const execFileAsync = promisify(execFile);
 
@@ -34,7 +35,7 @@ export class SeedBootstrapService implements OnModuleInit {
 
     this.seedPromise = (async () => {
       try {
-        await this.patchMissingColumns();
+        await patchRevenueSchema(this.prisma);
 
         const agencies = await this.prisma.agency.count();
         if (agencies === 0) {
@@ -71,22 +72,5 @@ export class SeedBootstrapService implements OnModuleInit {
     })();
 
     return this.seedPromise;
-  }
-
-  /** Best-effort column patches when migrate deploy lagged behind Prisma schema. */
-  private async patchMissingColumns() {
-    const statements = [
-      'ALTER TABLE InvoiceLine ADD COLUMN taxRatePercent DECIMAL(7,4) NOT NULL DEFAULT 0',
-      'ALTER TABLE InvoiceLine ADD COLUMN taxMinor INT NOT NULL DEFAULT 0',
-      'ALTER TABLE Invoice ADD COLUMN amountPaidMinor INT NOT NULL DEFAULT 0',
-    ];
-    for (const sql of statements) {
-      try {
-        await this.prisma.$executeRawUnsafe(sql);
-        this.logger.warn(`Applied schema patch: ${sql}`);
-      } catch {
-        // Column already exists or table missing — ignore
-      }
-    }
   }
 }
