@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Building2, CheckCircle2, Copy, Loader2, QrCode, RefreshCw, Landmark } from 'lucide-react';
+import { Building2, CheckCircle2, Copy, CreditCard, Loader2, QrCode, RefreshCw, Landmark } from 'lucide-react';
 import { publicApi, ApiError } from '@/lib/public-api';
+import { openPaystackCheckout } from '@/lib/paystack';
 import { formatDate, methodLabel } from '@/lib/utils';
 
 type PaymentDetails = {
@@ -14,6 +15,10 @@ type PaymentDetails = {
   amountFormatted: string;
   currency: string;
   invoiceNumber: string;
+  payerEmail?: string | null;
+  payerName?: string | null;
+  provider?: string;
+  paystackPublicKey?: string | null;
   agency: { code: string; name: string };
   virtualAccount: {
     bank: string;
@@ -53,6 +58,7 @@ export default function PayByCodePage() {
   const [loading, setLoading] = useState(true);
   const [simulating, setSimulating] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [payingWithPaystack, setPayingWithPaystack] = useState(false);
   const [simulateMsg, setSimulateMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [receiptId, setReceiptId] = useState<string | null>(null);
@@ -103,14 +109,14 @@ export default function PayByCodePage() {
     }
   }
 
-  async function verifyPayment() {
+  async function verifyPayment(reference?: string) {
     if (!data) return;
     setVerifying(true);
     setSimulateMsg(null);
     try {
       const result = await publicApi<SimulateResponse>('/payments/verify', {
         method: 'POST',
-        body: { reference: data.paymentReference },
+        body: { reference: reference || data.paymentReference, provider: 'PAYSTACK' },
       });
       const id = result.receipt?.id || result.receipt?.receiptNumber;
       if (id) setReceiptId(id);
@@ -122,6 +128,51 @@ export default function PayByCodePage() {
       await load();
     } finally {
       setVerifying(false);
+    }
+  }
+
+  async function payWithPaystack() {
+    if (!data?.paystackPublicKey) {
+      setSimulateMsg('Paystack public key is not configured on the API.');
+      return;
+    }
+    if (data.status === 'PAID' || data.status === 'EXPIRED' || data.status === 'FAILED') return;
+
+    setPayingWithPaystack(true);
+    setSimulateMsg(null);
+    try {
+      const email =
+        data.payerEmail?.trim() ||
+        `${data.paymentCode.toLowerCase().replace(/[^a-z0-9]/g, '')}@pay.revenue.gov.ng`;
+
+      await openPaystackCheckout({
+        key: data.paystackPublicKey,
+        email,
+        amount: data.amountMinor,
+        ref: data.paymentReference,
+        currency: data.currency || 'NGN',
+        metadata: {
+          paymentCode: data.paymentCode,
+          invoiceNumber: data.invoiceNumber,
+          custom_fields: [
+            { display_name: 'Payment Code', variable_name: 'payment_code', value: data.paymentCode },
+            { display_name: 'Invoice', variable_name: 'invoice_number', value: data.invoiceNumber },
+          ],
+        },
+        callback: (response) => {
+          setPayingWithPaystack(false);
+          void verifyPayment(response.reference);
+        },
+        onClose: () => {
+          setPayingWithPaystack(false);
+          setSimulateMsg('Paystack checkout closed before payment completed.');
+        },
+      });
+      // Popup stays open; unlock the button if user dismisses without callback.
+      setPayingWithPaystack(false);
+    } catch (err) {
+      setSimulateMsg(err instanceof Error ? err.message : 'Unable to open Paystack checkout');
+      setPayingWithPaystack(false);
     }
   }
 
@@ -226,8 +277,7 @@ export default function PayByCodePage() {
                 )}
               </div>
               <p className="mt-2 text-xs text-[color:var(--pay-muted)]">
-                Prefer bank transfer to the virtual account below. Complete card or USSD payments via
-                your bank or provider app.
+                Pay with Paystack (card, USSD, bank) or transfer to the virtual account below.
               </p>
             </div>
           </div>
@@ -308,11 +358,26 @@ export default function PayByCodePage() {
             </button>
           ) : (
             <>
+              {data.paystackPublicKey ? (
+                <button
+                  type="button"
+                  onClick={payWithPaystack}
+                  disabled={payingWithPaystack || verifying}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-white transition hover:bg-accent-600 disabled:opacity-60 sm:w-auto"
+                >
+                  {payingWithPaystack ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CreditCard className="h-4 w-4" />
+                  )}
+                  Pay with Paystack
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={verifyPayment}
+                onClick={() => verifyPayment()}
                 disabled={verifying}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-white transition hover:bg-accent-600 disabled:opacity-60 sm:w-auto"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[color:var(--pay-border)] bg-white px-4 text-sm font-medium text-navy transition hover:bg-[color:var(--surface)] disabled:opacity-60 sm:w-auto"
               >
                 {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 I have paid — verify

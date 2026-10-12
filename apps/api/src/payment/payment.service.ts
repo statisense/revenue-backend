@@ -269,6 +269,8 @@ export class PaymentService {
       });
     }
 
+    const paystackPublicKey = this.config.get<string>('PAYSTACK_PUBLIC_KEY') || '';
+
     return {
       paymentCode: pr.paymentCode,
       paymentReference: pr.paymentReference,
@@ -280,10 +282,14 @@ export class PaymentService {
       }).format(pr.amountMinor / 100),
       currency: pr.currency,
       invoiceNumber: pr.invoice.invoiceNumber,
+      payerEmail: pr.invoice.payerEmail,
+      payerName: pr.invoice.payerName,
       agency: {
         code: pr.invoice.agency.code,
         name: pr.invoice.agency.name,
       },
+      provider: pr.provider,
+      paystackPublicKey: paystackPublicKey.startsWith('pk_') ? paystackPublicKey : null,
       virtualAccount: pr.virtualAccount
         ? {
             bank: pr.virtualAccount.bankName,
