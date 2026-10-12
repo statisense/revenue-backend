@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type RevenueType = { id: string; code: string; name: string; defaultAmountMinor?: number | null };
 type TaxType = { id: string; code: string; name: string; ratePercent: number | string };
@@ -308,10 +308,10 @@ export default function InvoicesPage() {
   const viewing = mode === 'view' ? detail.data : null;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Invoices"
-        description="Issued bills ready for collection"
+        description="Issued bills, payer details, and collection readiness"
         actions={
           <Button onClick={() => (mode === 'none' ? openCreate() : closePanels())}>
             {mode === 'none' ? 'Create invoice' : 'Close'}
@@ -591,7 +591,7 @@ export default function InvoicesPage() {
         </Card>
       )}
 
-      {list.isLoading && <p className="text-sm text-muted-foreground">Loading invoices…</p>}
+      {list.isLoading && <LoadingState label="Loading invoices…" />}
       {list.error && (
         <ErrorState
           message={list.error instanceof Error ? list.error.message : 'Failed to load'}
@@ -600,6 +600,7 @@ export default function InvoicesPage() {
       )}
       {list.data && (
         <DataTable
+          searchPlaceholder="Search invoice, payer, status…"
           columns={[
             { key: 'number', label: 'Invoice' },
             { key: 'payer', label: 'Payer' },
@@ -611,6 +612,8 @@ export default function InvoicesPage() {
           rows={list.data.map((inv) => {
             const mutable = canMutateInvoice(inv);
             return {
+              __id: inv.id,
+              __search: `${inv.invoiceNumber} ${inv.payerName} ${inv.payerEmail ?? ''} ${inv.payerPhone ?? ''} ${inv.status} ${inv.totalMinor}`,
               number: <span className="font-medium">{inv.invoiceNumber}</span>,
               payer: (
                 <div className="min-w-[10rem] space-y-0.5">

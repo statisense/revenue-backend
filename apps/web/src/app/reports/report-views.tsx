@@ -25,6 +25,7 @@ import {
   KpiCard,
   ReportFooter,
   ReportMasthead,
+  ReportSheet,
   SectionTitle,
   shareBar,
   pct,
@@ -47,11 +48,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function Sheet({ children }: { children: React.ReactNode }) {
-  return (
-    <article className="report-print-root report-sheet space-y-8 rounded-xl border border-border bg-card p-4 shadow-panel sm:p-6 lg:p-8 print:border-0 print:p-0 print:shadow-none">
-      {children}
-    </article>
-  );
+  return <ReportSheet>{children}</ReportSheet>;
 }
 
 export function CollectionView({ data }: { data: any }) {
@@ -224,6 +221,7 @@ export function CollectionView({ data }: { data: any }) {
         <div>
           <h3 className="mb-3 font-serif text-lg">Top payers</h3>
           <DataTable
+            caption="Concentration analysis — top payers in period"
             headers={[
               { label: '#' },
               { label: 'Payer' },
@@ -235,12 +233,12 @@ export function CollectionView({ data }: { data: any }) {
             empty={!data.topPayers?.length}
           >
             {data.topPayers?.map((p: any, idx: number) => (
-              <tr key={p.payerName} className="border-b border-border/80 last:border-0">
-                <td className="px-3 py-2.5 text-muted-foreground">{idx + 1}</td>
-                <td className="px-3 py-2.5 font-medium">{p.payerName}</td>
-                <td className="px-3 py-2.5">{formatNumber(p.count)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{formatMoney(p.amountMinor)}</td>
-                <td className="px-3 py-2.5 text-right text-muted-foreground">{pct(p.amountMinor, collected)}%</td>
+              <tr key={p.payerName}>
+                <td className="text-muted-foreground">{idx + 1}</td>
+                <td className="font-medium">{p.payerName}</td>
+                <td>{formatNumber(p.count)}</td>
+                <td className="text-right tabular-nums">{formatMoney(p.amountMinor)}</td>
+                <td className="text-right text-muted-foreground">{pct(p.amountMinor, collected)}%</td>
               </tr>
             ))}
           </DataTable>
@@ -248,8 +246,13 @@ export function CollectionView({ data }: { data: any }) {
       </section>
 
       <section>
-        <SectionTitle eyebrow="04 · Register" title="Collections register" />
+        <SectionTitle
+          eyebrow="04 · Register"
+          title="Collections register"
+          description="Confirmed receipts forming the cash book source for this reporting window."
+        />
         <DataTable
+          caption="Collections register (confirmed payments)"
           headers={[
             { label: 'Paid at' },
             { label: 'Code' },
@@ -260,15 +263,27 @@ export function CollectionView({ data }: { data: any }) {
           ]}
           colSpan={6}
           empty={!data.recentCollections?.length}
+          footer={
+            <tr>
+              <td colSpan={5}>Period total (register sample)</td>
+              <td className="text-right tabular-nums">
+                {formatMoney(
+                  (data.recentCollections ?? []).reduce((s: number, r: any) => s + (r.amountMinor ?? 0), 0),
+                )}
+              </td>
+            </tr>
+          }
         >
           {data.recentCollections?.map((r: any) => (
-            <tr key={r.id} className="border-b border-border/80 last:border-0">
-              <td className="whitespace-nowrap px-3 py-2.5">{formatDate(r.paidAt)}</td>
-              <td className="px-3 py-2.5 font-mono text-xs">{r.paymentCode}</td>
-              <td className="px-3 py-2.5">{r.invoiceNumber}</td>
-              <td className="px-3 py-2.5">{r.payerName}</td>
-              <td className="px-3 py-2.5">{r.provider || '—'}</td>
-              <td className="px-3 py-2.5 text-right font-medium tabular-nums">{formatMoney(r.amountMinor, r.currency)}</td>
+            <tr key={r.id}>
+              <td className="whitespace-nowrap">{formatDate(r.paidAt)}</td>
+              <td className="font-mono text-xs">{r.paymentCode}</td>
+              <td>{r.invoiceNumber}</td>
+              <td>{r.payerName}</td>
+              <td>{r.provider || '—'}</td>
+              <td className="text-right font-medium tabular-nums">
+                {formatMoney(r.amountMinor, r.currency)}
+              </td>
             </tr>
           ))}
         </DataTable>
@@ -321,8 +336,13 @@ export function AgedReceivablesView({ data }: { data: any }) {
         </Card>
       </section>
       <section>
-        <SectionTitle eyebrow="02 · Detail" title="Aging schedule" />
+        <SectionTitle
+          eyebrow="02 · Detail"
+          title="Aging schedule"
+          description="Outstanding invoices aged by due date for credit control and audit follow-up."
+        />
         <DataTable
+          caption="AR aging schedule"
           headers={[
             { label: 'Invoice' },
             { label: 'Payer' },
@@ -334,16 +354,22 @@ export function AgedReceivablesView({ data }: { data: any }) {
           ]}
           colSpan={7}
           empty={!data.rows?.length}
+          footer={
+            <tr>
+              <td colSpan={6}>Total outstanding</td>
+              <td className="text-right tabular-nums">{formatMoney(data.kpis.outstandingMinor)}</td>
+            </tr>
+          }
         >
           {data.rows?.map((r: any) => (
-            <tr key={r.invoiceNumber} className="border-b border-border/80 last:border-0">
-              <td className="px-3 py-2.5 font-medium">{r.invoiceNumber}</td>
-              <td className="px-3 py-2.5">{r.payerName}</td>
-              <td className="px-3 py-2.5">{r.branch}</td>
-              <td className="px-3 py-2.5">{formatDate(r.dueAt)}</td>
-              <td className="px-3 py-2.5">{r.daysPastDue}</td>
-              <td className="px-3 py-2.5">{r.bucket}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums font-medium">{formatMoney(r.balanceMinor)}</td>
+            <tr key={r.invoiceNumber}>
+              <td className="font-medium">{r.invoiceNumber}</td>
+              <td>{r.payerName}</td>
+              <td>{r.branch}</td>
+              <td>{formatDate(r.dueAt)}</td>
+              <td className="tabular-nums">{r.daysPastDue}</td>
+              <td>{r.bucket}</td>
+              <td className="text-right font-medium tabular-nums">{formatMoney(r.balanceMinor)}</td>
             </tr>
           ))}
         </DataTable>
@@ -394,8 +420,13 @@ export function CashReceiptsView({ data }: { data: any }) {
         </Card>
       </section>
       <section>
-        <SectionTitle eyebrow="02 · Journal" title="Cash receipts journal" />
+        <SectionTitle
+          eyebrow="02 · Journal"
+          title="Cash receipts journal"
+          description="Day-book of confirmed receipts with payer, channel, and invoice reference."
+        />
         <DataTable
+          caption="Cash receipts journal (CRJ)"
           headers={[
             { label: 'Paid at' },
             { label: 'Receipt #' },
@@ -409,18 +440,24 @@ export function CashReceiptsView({ data }: { data: any }) {
           ]}
           colSpan={9}
           empty={!data.rows?.length}
+          footer={
+            <tr>
+              <td colSpan={8}>Journal total</td>
+              <td className="text-right tabular-nums">{formatMoney(data.kpis.totalMinor)}</td>
+            </tr>
+          }
         >
           {data.rows?.map((r: any, i: number) => (
-            <tr key={`${r.paymentCode}-${i}`} className="border-b border-border/80 last:border-0">
-              <td className="whitespace-nowrap px-3 py-2.5">{formatDate(r.paidAt)}</td>
-              <td className="px-3 py-2.5 font-mono text-xs">{r.receiptNumber}</td>
-              <td className="px-3 py-2.5 font-mono text-xs">{r.paymentCode}</td>
-              <td className="px-3 py-2.5">{r.invoiceNumber}</td>
-              <td className="px-3 py-2.5">{r.payerName}</td>
-              <td className="px-3 py-2.5">{r.method}</td>
-              <td className="px-3 py-2.5">{r.provider}</td>
-              <td className="px-3 py-2.5">{r.branch}</td>
-              <td className="px-3 py-2.5 text-right font-medium tabular-nums">{formatMoney(r.amountMinor)}</td>
+            <tr key={`${r.paymentCode}-${i}`}>
+              <td className="whitespace-nowrap">{formatDate(r.paidAt)}</td>
+              <td className="font-mono text-xs">{r.receiptNumber}</td>
+              <td className="font-mono text-xs">{r.paymentCode}</td>
+              <td>{r.invoiceNumber}</td>
+              <td>{r.payerName}</td>
+              <td>{r.method}</td>
+              <td>{r.provider}</td>
+              <td>{r.branch}</td>
+              <td className="text-right font-medium tabular-nums">{formatMoney(r.amountMinor)}</td>
             </tr>
           ))}
         </DataTable>
@@ -471,8 +508,13 @@ export function RevenueGlView({ data }: { data: any }) {
         </Card>
       </section>
       <section>
-        <SectionTitle eyebrow="02 · Fee lines" title="Revenue type / GL mapping" />
+        <SectionTitle
+          eyebrow="02 · Fee lines"
+          title="Revenue type / GL mapping"
+          description="Recognised revenue mapped to fee types and general-ledger codes."
+        />
         <DataTable
+          caption="Revenue by type & GL"
           headers={[
             { label: 'Code' },
             { label: 'Revenue type' },
@@ -484,16 +526,23 @@ export function RevenueGlView({ data }: { data: any }) {
           ]}
           colSpan={7}
           empty={!data.lines?.length}
+          footer={
+            <tr>
+              <td colSpan={5}>Recognised total</td>
+              <td className="text-right tabular-nums">{formatMoney(data.kpis.totalMinor)}</td>
+              <td className="text-right">100%</td>
+            </tr>
+          }
         >
           {data.lines?.map((r: any) => (
-            <tr key={r.revenueTypeCode} className="border-b border-border/80 last:border-0">
-              <td className="px-3 py-2.5 font-mono text-xs">{r.revenueTypeCode}</td>
-              <td className="px-3 py-2.5 font-medium">{r.revenueTypeName}</td>
-              <td className="px-3 py-2.5">{r.category}</td>
-              <td className="px-3 py-2.5 font-mono text-xs">{r.glCode}</td>
-              <td className="px-3 py-2.5">{formatNumber(r.lineCount)}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{formatMoney(r.amountMinor)}</td>
-              <td className="px-3 py-2.5 text-right text-muted-foreground">{r.sharePct}%</td>
+            <tr key={r.revenueTypeCode}>
+              <td className="font-mono text-xs">{r.revenueTypeCode}</td>
+              <td className="font-medium">{r.revenueTypeName}</td>
+              <td>{r.category}</td>
+              <td className="font-mono text-xs">{r.glCode}</td>
+              <td>{formatNumber(r.lineCount)}</td>
+              <td className="text-right tabular-nums">{formatMoney(r.amountMinor)}</td>
+              <td className="text-right text-muted-foreground">{r.sharePct}%</td>
             </tr>
           ))}
         </DataTable>
@@ -551,8 +600,13 @@ export function TreasurySettlementView({ data }: { data: any }) {
         </DataTable>
       </section>
       <section>
-        <SectionTitle eyebrow="03 · Detail" title="Settlement register" />
+        <SectionTitle
+          eyebrow="03 · Detail"
+          title="Settlement register"
+          description="Payment remittances mapped to settlement batches and TSA accounts."
+        />
         <DataTable
+          caption="TSA remittance register"
           headers={[
             { label: 'Invoice' },
             { label: 'Payer' },
@@ -563,15 +617,23 @@ export function TreasurySettlementView({ data }: { data: any }) {
           ]}
           colSpan={6}
           empty={!data.rows?.length}
+          footer={
+            <tr>
+              <td colSpan={5}>Register total</td>
+              <td className="text-right tabular-nums">
+                {formatMoney((data.rows ?? []).reduce((s: number, r: any) => s + (r.amountMinor ?? 0), 0))}
+              </td>
+            </tr>
+          }
         >
           {data.rows?.map((r: any) => (
-            <tr key={r.id} className="border-b border-border/80 last:border-0">
-              <td className="px-3 py-2.5">{r.invoiceNumber}</td>
-              <td className="px-3 py-2.5">{r.payerName}</td>
-              <td className="px-3 py-2.5 font-mono text-xs">{r.batchNumber}</td>
-              <td className="px-3 py-2.5">{r.status}</td>
-              <td className="px-3 py-2.5 font-mono text-xs">{r.tsaAccount || '—'}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{formatMoney(r.amountMinor)}</td>
+            <tr key={r.id}>
+              <td>{r.invoiceNumber}</td>
+              <td>{r.payerName}</td>
+              <td className="font-mono text-xs">{r.batchNumber}</td>
+              <td>{r.status}</td>
+              <td className="font-mono text-xs">{r.tsaAccount || '—'}</td>
+              <td className="text-right tabular-nums">{formatMoney(r.amountMinor)}</td>
             </tr>
           ))}
         </DataTable>
@@ -603,8 +665,13 @@ export function RefundsView({ data }: { data: any }) {
         </div>
       </section>
       <section>
-        <SectionTitle eyebrow="02 · Register" title="Refunds & adjustments" />
+        <SectionTitle
+          eyebrow="02 · Register"
+          title="Refunds & adjustments"
+          description="Refunds processed against collections with reason and status control."
+        />
         <DataTable
+          caption="Refund register"
           headers={[
             { label: 'Created' },
             { label: 'Status' },
@@ -616,16 +683,22 @@ export function RefundsView({ data }: { data: any }) {
           ]}
           colSpan={7}
           empty={!data.rows?.length}
+          footer={
+            <tr>
+              <td colSpan={6}>Total refunded</td>
+              <td className="text-right tabular-nums">{formatMoney(data.kpis.totalMinor)}</td>
+            </tr>
+          }
         >
           {data.rows?.map((r: any) => (
-            <tr key={r.id} className="border-b border-border/80 last:border-0">
-              <td className="px-3 py-2.5">{formatDate(r.createdAt)}</td>
-              <td className="px-3 py-2.5">{r.status}</td>
-              <td className="px-3 py-2.5">{r.invoiceNumber}</td>
-              <td className="px-3 py-2.5">{r.payerName}</td>
-              <td className="px-3 py-2.5 font-mono text-xs">{r.paymentCode}</td>
-              <td className="max-w-[200px] truncate px-3 py-2.5">{r.reason}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{formatMoney(r.amountMinor)}</td>
+            <tr key={r.id}>
+              <td>{formatDate(r.createdAt)}</td>
+              <td>{r.status}</td>
+              <td>{r.invoiceNumber}</td>
+              <td>{r.payerName}</td>
+              <td className="font-mono text-xs">{r.paymentCode}</td>
+              <td className="max-w-[200px] truncate">{r.reason}</td>
+              <td className="text-right tabular-nums">{formatMoney(r.amountMinor)}</td>
             </tr>
           ))}
         </DataTable>
@@ -702,6 +775,7 @@ export function PaymentChannelsView({ data }: { data: any }) {
       <section>
         <SectionTitle eyebrow="02 · Methods" title="Payment method breakdown" />
         <DataTable
+          caption="Collections by payment method"
           headers={[
             { label: 'Method' },
             { label: 'Count' },
@@ -710,13 +784,21 @@ export function PaymentChannelsView({ data }: { data: any }) {
           ]}
           colSpan={4}
           empty={!data.byMethod?.length}
+          footer={
+            <tr>
+              <td>Total</td>
+              <td>{formatNumber(data.kpis.paymentCount)}</td>
+              <td className="text-right tabular-nums">{formatMoney(data.kpis.totalMinor)}</td>
+              <td className="text-right">100%</td>
+            </tr>
+          }
         >
           {data.byMethod?.map((m: any) => (
-            <tr key={m.method} className="border-b border-border/80 last:border-0">
-              <td className="px-3 py-2.5 font-medium">{m.method}</td>
-              <td className="px-3 py-2.5">{formatNumber(m.count)}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{formatMoney(m.amountMinor)}</td>
-              <td className="px-3 py-2.5 text-right text-muted-foreground">{m.sharePct}%</td>
+            <tr key={m.method}>
+              <td className="font-medium">{m.method}</td>
+              <td>{formatNumber(m.count)}</td>
+              <td className="text-right tabular-nums">{formatMoney(m.amountMinor)}</td>
+              <td className="text-right text-muted-foreground">{m.sharePct}%</td>
             </tr>
           ))}
         </DataTable>
@@ -751,6 +833,7 @@ export function OfficerProductivityView({ data }: { data: any }) {
       <section>
         <SectionTitle eyebrow="02 · Detail" title="By officer" />
         <DataTable
+          caption="Officer assessment productivity"
           headers={[
             { label: 'Officer' },
             { label: 'Assessments' },
@@ -762,16 +845,24 @@ export function OfficerProductivityView({ data }: { data: any }) {
           ]}
           colSpan={7}
           empty={!data.officers?.length}
+          footer={
+            <tr>
+              <td>Total</td>
+              <td>{formatNumber(data.kpis.assessmentCount)}</td>
+              <td colSpan={4} />
+              <td className="text-right tabular-nums">{formatMoney(data.kpis.totalMinor)}</td>
+            </tr>
+          }
         >
           {data.officers?.map((o: any) => (
-            <tr key={o.name} className="border-b border-border/80 last:border-0">
-              <td className="px-3 py-2.5 font-medium">{o.name}</td>
-              <td className="px-3 py-2.5">{formatNumber(o.assessments)}</td>
-              <td className="px-3 py-2.5">{formatNumber(o.approved)}</td>
-              <td className="px-3 py-2.5">{formatNumber(o.pending)}</td>
-              <td className="px-3 py-2.5">{formatNumber(o.rejected)}</td>
-              <td className="px-3 py-2.5">{formatNumber(o.invoiced)}</td>
-              <td className="px-3 py-2.5 text-right tabular-nums">{formatMoney(o.amountMinor)}</td>
+            <tr key={o.name}>
+              <td className="font-medium">{o.name}</td>
+              <td>{formatNumber(o.assessments)}</td>
+              <td>{formatNumber(o.approved)}</td>
+              <td>{formatNumber(o.pending)}</td>
+              <td>{formatNumber(o.rejected)}</td>
+              <td>{formatNumber(o.invoiced)}</td>
+              <td className="text-right tabular-nums">{formatMoney(o.amountMinor)}</td>
             </tr>
           ))}
         </DataTable>
@@ -828,6 +919,7 @@ export function BranchComparativeView({ data }: { data: any }) {
       <section>
         <SectionTitle eyebrow="02 · Detail" title="Branch comparative table" />
         <DataTable
+          caption="Branch / command comparative scorecard"
           headers={[
             { label: 'Code' },
             { label: 'Branch' },
@@ -839,16 +931,25 @@ export function BranchComparativeView({ data }: { data: any }) {
           ]}
           colSpan={7}
           empty={!data.rows?.length}
+          footer={
+            <tr>
+              <td colSpan={3}>All branches</td>
+              <td className="tabular-nums">{formatMoney(data.kpis.totalCollectedMinor)}</td>
+              <td className="tabular-nums">{formatMoney(data.kpis.totalOutstandingMinor)}</td>
+              <td />
+              <td className="text-right">100%</td>
+            </tr>
+          }
         >
           {data.rows?.map((r: any) => (
-            <tr key={r.branchId} className="border-b border-border/80 last:border-0">
-              <td className="px-3 py-2.5 font-mono text-xs">{r.code}</td>
-              <td className="px-3 py-2.5 font-medium">{r.name}</td>
-              <td className="px-3 py-2.5">{r.state || '—'}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatMoney(r.collectedMinor)}</td>
-              <td className="px-3 py-2.5 tabular-nums">{formatMoney(r.outstandingMinor)}</td>
-              <td className="px-3 py-2.5">{formatNumber(r.assessments)}</td>
-              <td className="px-3 py-2.5 text-right text-muted-foreground">{r.collectionSharePct}%</td>
+            <tr key={r.branchId}>
+              <td className="font-mono text-xs">{r.code}</td>
+              <td className="font-medium">{r.name}</td>
+              <td>{r.state || '—'}</td>
+              <td className="tabular-nums">{formatMoney(r.collectedMinor)}</td>
+              <td className="tabular-nums">{formatMoney(r.outstandingMinor)}</td>
+              <td>{formatNumber(r.assessments)}</td>
+              <td className="text-right text-muted-foreground">{r.collectionSharePct}%</td>
             </tr>
           ))}
         </DataTable>

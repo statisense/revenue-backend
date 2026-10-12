@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type Category = { id: string; code: string; name: string; description?: string | null };
 type FeeSchedule = { id: string; name: string; amountMinor: number; isActive: boolean };
@@ -181,10 +181,10 @@ export default function RevenuePage() {
   const typeFormTitle = mode === 'edit-type' ? 'Edit revenue type' : 'New revenue type';
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Revenue"
-        description="Categories and revenue types for billing"
+        description="Fee catalogue, categories, and default GL mappings"
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -333,7 +333,7 @@ export default function RevenuePage() {
       )}
 
       {(categories.isLoading || types.isLoading) && (
-        <p className="text-sm text-muted-foreground">Loading revenue catalogue…</p>
+        <LoadingState label="Loading revenue catalogue…" />
       )}
       {loadError && (
         <ErrorState
@@ -347,6 +347,7 @@ export default function RevenuePage() {
 
       {types.data && (
         <DataTable
+          searchPlaceholder="Search code, name, category, GL…"
           columns={[
             { key: 'code', label: 'Code' },
             { key: 'name', label: 'Name' },
@@ -357,13 +358,16 @@ export default function RevenuePage() {
           ]}
           rows={types.data.map((t) => {
             const amount = resolveAmountMinor(t);
+            const categoryName =
+              t.category?.name ??
+              categories.data?.find((c) => c.id === t.categoryId)?.name ??
+              '—';
             return {
+              __id: t.id,
+              __search: `${t.code} ${t.name} ${categoryName} ${t.glCode || ''}`,
               code: <span className="font-medium">{t.code}</span>,
               name: t.name,
-              category:
-                t.category?.name ??
-                categories.data?.find((c) => c.id === t.categoryId)?.name ??
-                '—',
+              category: categoryName,
               amount: amount != null ? formatMoney(amount) : '—',
               gl: t.glCode || '—',
               actions: (

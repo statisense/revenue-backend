@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type RevenueType = { id: string; code: string; name: string; defaultAmountMinor?: number | null };
 type TaxType = { id: string; code: string; name: string; ratePercent: number | string };
@@ -145,7 +145,7 @@ export default function AssessmentsPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Assessments"
         description="Create, submit, and approve Government Revenue assessments"
@@ -280,7 +280,7 @@ export default function AssessmentsPage() {
         </Card>
       )}
 
-      {list.isLoading && <p className="text-sm text-muted-foreground">Loading assessments…</p>}
+      {list.isLoading && <LoadingState label="Loading assessments…" />}
       {list.error && (
         <ErrorState
           message={list.error instanceof Error ? list.error.message : 'Failed to load'}
@@ -289,6 +289,7 @@ export default function AssessmentsPage() {
       )}
       {list.data && (
         <DataTable
+          searchPlaceholder="Search number, payer, status…"
           columns={[
             { key: 'number', label: 'Number' },
             { key: 'payer', label: 'Payer' },
@@ -298,6 +299,8 @@ export default function AssessmentsPage() {
             { key: 'actions', label: 'Actions' },
           ]}
           rows={list.data.map((a) => ({
+            __id: a.id,
+            __search: `${a.assessmentNumber || ''} ${a.id} ${a.payerName} ${a.status}`,
             number: a.assessmentNumber || a.id.slice(0, 8),
             payer: a.payerName,
             amount: (

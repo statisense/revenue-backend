@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type Gateway = {
   id: string;
@@ -60,7 +60,7 @@ export default function GatewaysPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Payment Gateways"
         description="Paystack, Flutterwave, and Remita configuration"
@@ -117,12 +117,13 @@ export default function GatewaysPage() {
         </Card>
       )}
 
-      {list.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {list.isLoading && <LoadingState label="Loading gateways…" />}
       {list.error && (
         <ErrorState message={list.error instanceof Error ? list.error.message : 'Failed'} onRetry={() => list.refetch()} />
       )}
       {list.data && (
         <DataTable
+          searchPlaceholder="Search provider…"
           columns={[
             { key: 'provider', label: 'Provider' },
             { key: 'active', label: 'Active' },
@@ -131,6 +132,8 @@ export default function GatewaysPage() {
             { key: 'updated', label: 'Updated' },
           ]}
           rows={list.data.map((g) => ({
+            __id: g.id ?? g.provider,
+            __search: `${g.provider} ${g.isActive ? 'active yes' : 'inactive no'} ${g.isDefault ? 'default' : ''} ${g.hasSecret ? 'secret' : ''}`,
             provider: g.provider,
             active: <Badge variant={g.isActive ? 'success' : 'muted'}>{g.isActive ? 'Yes' : 'No'}</Badge>,
             default: g.isDefault ? 'Default' : '—',

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type Role = { id: string; code: string; name: string };
 type UserRow = {
@@ -78,7 +78,7 @@ export default function UsersPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Users"
         description="Officers and administrators with portal access"
@@ -138,7 +138,7 @@ export default function UsersPage() {
         </Card>
       )}
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading users…</p>}
+      {isLoading && <LoadingState label="Loading users…" />}
       {error && (
         <ErrorState
           message={error instanceof Error ? error.message : 'Failed to load users'}
@@ -147,6 +147,7 @@ export default function UsersPage() {
       )}
       {data && (
         <DataTable
+          searchPlaceholder="Search name, email, role…"
           columns={[
             { key: 'name', label: 'Name' },
             { key: 'email', label: 'Email' },
@@ -154,20 +155,26 @@ export default function UsersPage() {
             { key: 'status', label: 'Status' },
             { key: 'actions', label: 'Actions' },
           ]}
-          rows={data.map((u) => ({
-            name: `${u.firstName} ${u.lastName}`,
-            email: u.email,
-            roles: (u.roles ?? []).map((r) => r.code || r.name).filter(Boolean).join(', ') || '—',
-            status: <Badge variant={u.status === 'ACTIVE' ? 'success' : 'muted'}>{u.status || '—'}</Badge>,
-            actions:
-              u.status === 'ACTIVE' ? (
-                <Button size="sm" variant="outline" onClick={() => deactivate.mutate(u.id)}>
-                  Deactivate
-                </Button>
-              ) : (
-                '—'
-              ),
-          }))}
+          rows={data.map((u) => {
+            const roles = (u.roles ?? []).map((r) => r.code || r.name).filter(Boolean).join(', ') || '—';
+            const name = `${u.firstName} ${u.lastName}`;
+            return {
+              __id: u.id,
+              __search: `${name} ${u.email} ${roles} ${u.status ?? ''}`,
+              name,
+              email: u.email,
+              roles,
+              status: <Badge variant={u.status === 'ACTIVE' ? 'success' : 'muted'}>{u.status || '—'}</Badge>,
+              actions:
+                u.status === 'ACTIVE' ? (
+                  <Button size="sm" variant="outline" onClick={() => deactivate.mutate(u.id)}>
+                    Deactivate
+                  </Button>
+                ) : (
+                  '—'
+                ),
+            };
+          })}
         />
       )}
     </div>

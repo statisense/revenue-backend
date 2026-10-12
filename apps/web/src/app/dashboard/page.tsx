@@ -25,7 +25,7 @@ import { api } from '@/lib/api';
 import { formatMoney, formatNumber } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { PageHeader } from '@/components/page-shell';
+import { ErrorState, LoadingState, PageHeader } from '@/components/page-shell';
 
 type DashboardData = {
   todaysRevenue: number;
@@ -65,12 +65,11 @@ function StatCard({
   delay?: string;
 }) {
   return (
-    <Card className={`animate-fade-up overflow-hidden ${delay ?? ''}`}>
-      <div className="h-0.5 w-full bg-gradient-to-r from-navy via-accent to-brass" />
+    <Card className={`animate-fade-up ${delay ?? ''}`}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
           <CardDescription className="text-[11px] uppercase tracking-[0.12em]">{title}</CardDescription>
-          <CardTitle className="mt-1.5 font-serif text-2xl tracking-tight">{value}</CardTitle>
+          <CardTitle className="mt-1.5 font-serif text-2xl tracking-tight tabular-nums">{value}</CardTitle>
         </div>
         <div className="rounded-md bg-navy/8 p-2 text-navy dark:bg-accent/15 dark:text-accent-200">
           <Icon className="h-4 w-4" />
@@ -96,32 +95,25 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-10 w-64 skeleton rounded-md" />
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-28 skeleton rounded-lg" />
-          ))}
-        </div>
+        <PageHeader title="Collection Dashboard" description="Loading live collection overview…" />
+        <LoadingState label="Loading dashboard metrics…" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Unable to load dashboard</CardTitle>
-          <CardDescription>
-            {error instanceof Error ? error.message : 'Unknown error'}
-            {!error && ' — ensure the API is running and the database is seeded.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <button className="text-sm text-accent underline" onClick={() => refetch()}>
-            Retry
-          </button>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <PageHeader title="Collection Dashboard" description="Live collection overview" />
+        <ErrorState
+          message={
+            error instanceof Error
+              ? error.message
+              : 'Unable to load dashboard — ensure the API is running and the database is seeded.'
+          }
+          onRetry={() => refetch()}
+        />
+      </div>
     );
   }
 

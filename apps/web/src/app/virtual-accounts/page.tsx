@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { formatDate, formatMoney } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { DataTable, ErrorState, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, LoadingState, PageHeader } from '@/components/page-shell';
 
 type VA = {
   id: string;
@@ -23,14 +23,15 @@ export default function VirtualAccountsPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader title="Virtual Accounts" description="Dedicated NUBAN / Remita collection accounts" />
-      {list.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {list.isLoading && <LoadingState label="Loading virtual accounts…" />}
       {list.error && (
         <ErrorState message={list.error instanceof Error ? list.error.message : 'Failed'} onRetry={() => list.refetch()} />
       )}
       {list.data && (
         <DataTable
+          searchPlaceholder="Search code, account, bank…"
           columns={[
             { key: 'code', label: 'Payment code' },
             { key: 'account', label: 'Account' },
@@ -40,6 +41,8 @@ export default function VirtualAccountsPage() {
             { key: 'expires', label: 'Expires' },
           ]}
           rows={list.data.map((v) => ({
+            __id: v.id,
+            __search: `${v.paymentRequest?.paymentCode ?? ''} ${v.accountNumber} ${v.accountName} ${v.bankName} ${v.status}`,
             code: v.paymentRequest?.paymentCode ?? '—',
             account: `${v.accountNumber} (${v.accountName})`,
             bank: v.bankName,

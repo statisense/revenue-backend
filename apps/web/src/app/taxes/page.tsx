@@ -10,7 +10,7 @@ import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type TaxType = {
   id: string;
@@ -129,7 +129,7 @@ export default function TaxesPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Tax types"
         description="Nigerian tax rates applied on invoices as: total = revenue + (tax % × revenue)"
@@ -200,7 +200,7 @@ export default function TaxesPage() {
         </Card>
       )}
 
-      {taxes.isLoading && <p className="text-sm text-muted-foreground">Loading tax types…</p>}
+      {taxes.isLoading && <LoadingState label="Loading tax types…" />}
       {taxes.error && (
         <ErrorState
           message={taxes.error instanceof Error ? taxes.error.message : 'Failed to load tax types'}
@@ -210,6 +210,7 @@ export default function TaxesPage() {
 
       {taxes.data && (
         <DataTable
+          searchPlaceholder="Search code, name, rate…"
           columns={[
             { key: 'code', label: 'Code' },
             { key: 'name', label: 'Name' },
@@ -218,6 +219,8 @@ export default function TaxesPage() {
             { key: 'actions', label: 'Actions' },
           ]}
           rows={taxes.data.map((t) => ({
+            __id: t.id,
+            __search: `${t.code} ${t.name} ${formatRate(t.ratePercent)} ${t.description ?? ''}`,
             code: <span className="font-medium">{t.code}</span>,
             name: t.name,
             rate: <span className="tabular-nums font-medium">{formatRate(t.ratePercent)}</span>,

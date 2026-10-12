@@ -8,13 +8,16 @@ import {
   FileBarChart2,
   Printer,
   RefreshCw,
+  Search,
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ErrorState, PageHeader } from '@/components/page-shell';
-import { PERIODS } from './report-shared';
+import { ErrorState, LoadingState, PageHeader } from '@/components/page-shell';
+import { Input } from '@/components/ui/input';
+import { PERIODS, buildDocId, type ReportMeta } from './report-shared';
 import { renderReportView } from './report-views';
 
 type CatalogItem = {
@@ -112,9 +115,27 @@ const FALLBACK_CATALOG: CatalogItem[] = [
 ];
 
 function rowsForCsv(type: string, data: any): string[][] {
+  const meta = data.meta as ReportMeta | undefined;
+  const preamble: string[][] = meta
+    ? [
+        ['Document', buildDocId(meta)],
+        ['Agency', `${meta.agency.code} — ${meta.agency.name}`],
+        ['Report', meta.title],
+        ['Period', meta.period],
+        ['Coverage start', String(meta.start)],
+        ['Coverage end', String(meta.end)],
+        ['Generated at', String(meta.generatedAt)],
+        ['Currency', meta.currency],
+        ['Classification', meta.classification],
+        ['Basis', 'Cash / IPSAS'],
+        [],
+      ]
+    : [];
+
+  let body: string[][];
   switch (type) {
     case 'aged-receivables':
-      return [
+      body = [
         ['Invoice', 'Payer', 'Branch', 'Due', 'Days', 'Bucket', 'Balance'],
         ...(data.rows ?? []).map((r: any) => [
           r.invoiceNumber,
@@ -126,8 +147,9 @@ function rowsForCsv(type: string, data: any): string[][] {
           (r.balanceMinor / 100).toFixed(2),
         ]),
       ];
+      break;
     case 'cash-receipts':
-      return [
+      body = [
         ['Paid at', 'Receipt', 'Code', 'Invoice', 'Payer', 'Method', 'Provider', 'Branch', 'Amount'],
         ...(data.rows ?? []).map((r: any) => [
           r.paidAt ?? '',
@@ -141,8 +163,9 @@ function rowsForCsv(type: string, data: any): string[][] {
           (r.amountMinor / 100).toFixed(2),
         ]),
       ];
+      break;
     case 'revenue-gl':
-      return [
+      body = [
         ['Code', 'Revenue type', 'Category', 'GL', 'Lines', 'Amount', 'Share %'],
         ...(data.lines ?? []).map((r: any) => [
           r.revenueTypeCode,
@@ -154,8 +177,9 @@ function rowsForCsv(type: string, data: any): string[][] {
           r.sharePct,
         ]),
       ];
+      break;
     case 'treasury-settlement':
-      return [
+      body = [
         ['Invoice', 'Payer', 'Batch', 'Status', 'TSA account', 'Amount'],
         ...(data.rows ?? []).map((r: any) => [
           r.invoiceNumber,
@@ -166,8 +190,9 @@ function rowsForCsv(type: string, data: any): string[][] {
           (r.amountMinor / 100).toFixed(2),
         ]),
       ];
+      break;
     case 'refunds':
-      return [
+      body = [
         ['Created', 'Status', 'Invoice', 'Payer', 'Code', 'Reason', 'Amount'],
         ...(data.rows ?? []).map((r: any) => [
           r.createdAt ?? '',
@@ -179,8 +204,9 @@ function rowsForCsv(type: string, data: any): string[][] {
           (r.amountMinor / 100).toFixed(2),
         ]),
       ];
+      break;
     case 'payment-channels':
-      return [
+      body = [
         ['Dimension', 'Key', 'Count', 'Amount', 'Share %'],
         ...(data.byProvider ?? []).map((r: any) => [
           'Provider',
@@ -197,8 +223,9 @@ function rowsForCsv(type: string, data: any): string[][] {
           r.sharePct,
         ]),
       ];
+      break;
     case 'officer-productivity':
-      return [
+      body = [
         ['Officer', 'Assessments', 'Approved', 'Pending', 'Rejected', 'Invoiced', 'Value'],
         ...(data.officers ?? []).map((r: any) => [
           r.name,
@@ -210,8 +237,9 @@ function rowsForCsv(type: string, data: any): string[][] {
           (r.amountMinor / 100).toFixed(2),
         ]),
       ];
+      break;
     case 'branch-comparative':
-      return [
+      body = [
         ['Code', 'Branch', 'State', 'Collected', 'Outstanding', 'Assessments', 'Share %'],
         ...(data.rows ?? []).map((r: any) => [
           r.code,
@@ -223,8 +251,9 @@ function rowsForCsv(type: string, data: any): string[][] {
           r.collectionSharePct,
         ]),
       ];
+      break;
     default:
-      return [
+      body = [
         ['Paid at', 'Payment code', 'Invoice', 'Payer', 'Provider', 'Amount'],
         ...(data.recentCollections ?? []).map((r: any) => [
           r.paidAt ?? '',
@@ -236,12 +265,15 @@ function rowsForCsv(type: string, data: any): string[][] {
         ]),
       ];
   }
+
+  return [...preamble, ...body];
 }
 
 export default function ReportsPage() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [period, setPeriod] = useState('monthly');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [catalogQueryText, setCatalogQueryText] = useState('');
 
   const catalogQuery = useQuery({
     queryKey: ['reports-catalog'],
@@ -253,9 +285,15 @@ export default function ReportsPage() {
     () => ['All', ...Array.from(new Set(catalog.map((c) => c.category)))],
     [catalog],
   );
-  const filtered = catalog.filter(
-    (c) => categoryFilter === 'All' || c.category === categoryFilter,
-  );
+  const filtered = catalog.filter((c) => {
+    if (categoryFilter !== 'All' && c.category !== categoryFilter) return false;
+    const q = catalogQueryText.trim().toLowerCase();
+    if (!q) return true;
+    return [c.code, c.title, c.subtitle, c.category, c.audience, ...(c.standards ?? [])]
+      .join(' ')
+      .toLowerCase()
+      .includes(q);
+  });
   const selected = catalog.find((c) => c.id === selectedType) ?? null;
 
   const packQuery = useQuery({
@@ -268,11 +306,12 @@ export default function ReportsPage() {
     if (!packQuery.data || !selectedType) return;
     const rows = rowsForCsv(selectedType, packQuery.data);
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ncs-${selectedType}-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+    const meta = packQuery.data.meta as ReportMeta | undefined;
+    a.download = `${meta ? buildDocId(meta) : `ncs-${selectedType}-${period}`}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -281,8 +320,8 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div className="print:hidden">
         <PageHeader
-          title="Reports"
-          description="Industry-standard revenue and accounting packs for NCS collections"
+          title="Revenue reports"
+          description="Official collection, receivables, cash book, GL, and treasury packs for management and audit"
           actions={
             selectedType ? (
               <div className="flex flex-wrap gap-2">
@@ -312,28 +351,78 @@ export default function ReportsPage() {
           }
         />
 
-        {selectedType ? (
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-brass-deep">{selected?.code}</p>
-              <h2 className="font-serif text-xl text-navy dark:text-foreground">{selected?.title}</h2>
+        <div className="mb-5 overflow-hidden rounded-lg border border-brass/25 bg-gradient-to-r from-navy/[0.04] via-card to-accent/[0.05] shadow-panel">
+          <div className="h-0.5 w-full bg-gradient-to-r from-navy via-brass to-accent" />
+          <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-navy text-white">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-brass-deep">
+                  Official — for internal use
+                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Cash / IPSAS basis · Document-controlled packs · Printable A4 with sign-off blocks
+                </p>
+              </div>
             </div>
-            <div className="ml-auto flex flex-wrap gap-2">
-              {PERIODS.map((p) => (
-                <Button
-                  key={p.id}
-                  size="sm"
-                  variant={period === p.id ? 'default' : 'outline'}
-                  onClick={() => setPeriod(p.id)}
-                >
-                  {p.label}
-                </Button>
-              ))}
+            <Badge variant="outline" className="w-fit shrink-0">
+              {catalog.length} report packs
+            </Badge>
+          </div>
+        </div>
+
+        {selectedType ? (
+          <div className="mb-4 overflow-hidden rounded-lg border border-border/90 bg-card/90 shadow-panel">
+            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-brass-deep">
+                  {selected?.code} · {selected?.category}
+                </p>
+                <h2 className="font-serif text-xl text-navy dark:text-foreground">{selected?.title}</h2>
+                <p className="mt-1 max-w-xl text-xs text-muted-foreground">{selected?.subtitle}</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 rounded-md border border-border/80 bg-muted/40 p-1">
+                {PERIODS.map((p) => (
+                  <Button
+                    key={p.id}
+                    size="sm"
+                    variant={period === p.id ? 'default' : 'ghost'}
+                    className={cn(
+                      'h-8 px-3',
+                      period !== p.id && 'text-muted-foreground hover:text-foreground',
+                    )}
+                    onClick={() => setPeriod(p.id)}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
-          <>
-            <div className="mb-4 flex flex-wrap gap-2">
+          <p className="mb-4 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            Select a pack to generate an interactive, printable report aligned to revenue practice — cash book,
+            AR aging, GL revenue, TSA remittance, channel mix, and branch scorecards.
+          </p>
+        )}
+      </div>
+
+      {!selectedType && (
+        <div className="print:hidden space-y-4">
+          <div className="flex flex-col gap-3 rounded-lg border border-border/80 bg-card/80 p-3 shadow-panel sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1 sm:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={catalogQueryText}
+                onChange={(e) => setCatalogQueryText(e.target.value)}
+                placeholder="Search report packs, standards, audience…"
+                className="h-10 border-border/80 bg-background/80 pl-9"
+                aria-label="Search report catalog"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {categories.map((cat) => (
                 <button
                   key={cat}
@@ -342,53 +431,68 @@ export default function ReportsPage() {
                   className={cn(
                     'rounded-md px-3 py-1.5 text-sm transition',
                     categoryFilter === cat
-                      ? 'bg-navy text-white'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                      ? 'bg-navy text-white shadow-sm'
+                      : 'border border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground',
                   )}
                 >
                   {cat}
                 </button>
               ))}
             </div>
-            <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
-              Select a pack to generate an interactive, printable report aligned to revenue and accounting practice
-              (cash book, AR aging, GL revenue, TSA remittance, channel mix, and branch scorecards).
+            <p className="text-xs text-muted-foreground tabular-nums sm:ml-auto">
+              {filtered.length} of {catalog.length}
             </p>
-          </>
-        )}
-      </div>
+          </div>
 
-      {!selectedType && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 print:hidden">
-          {filtered.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setSelectedType(item.id)}
-              className="group rounded-xl border border-border bg-card p-5 text-left shadow-panel transition hover:border-accent/40 hover:shadow-md"
-            >
-              <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-navy text-white">
-                  <FileBarChart2 className="h-4 w-4" />
-                </div>
-                <Badge variant="outline">{item.code}</Badge>
-              </div>
-              <p className="text-[11px] uppercase tracking-[0.14em] text-brass-deep">{item.category}</p>
-              <h3 className="mt-1 font-serif text-lg text-navy group-hover:text-accent dark:text-foreground">
-                {item.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.subtitle}</p>
-              <p className="mt-3 text-[11px] text-muted-foreground">{item.audience}</p>
-              <p className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground/80">
-                {item.standards.join(' · ')}
-              </p>
-            </button>
-          ))}
+          {catalogQuery.isLoading ? <LoadingState label="Loading report catalog…" /> : null}
+
+          {filtered.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+              No report packs match your search.
+            </p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((item, idx) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedType(item.id)}
+                  className={cn(
+                    'group overflow-hidden rounded-xl border border-border/90 bg-card text-left shadow-panel transition duration-300 hover:border-accent/40 hover:shadow-lift animate-fade-up',
+                    idx % 3 === 0 && 'stagger-1',
+                    idx % 3 === 1 && 'stagger-2',
+                    idx % 3 === 2 && 'stagger-3',
+                  )}
+                >
+                  <div className="h-0.5 w-full bg-gradient-to-r from-navy via-brass to-accent" />
+                  <div className="p-5">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-navy text-white seal-ring">
+                        <FileBarChart2 className="h-4 w-4" />
+                      </div>
+                      <Badge variant="outline">{item.code}</Badge>
+                    </div>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-brass-deep">{item.category}</p>
+                    <h3 className="mt-1 font-serif text-lg text-navy transition-colors group-hover:text-accent dark:text-foreground">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.subtitle}</p>
+                    <p className="mt-3 text-[11px] text-muted-foreground">{item.audience}</p>
+                    <p className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground/80">
+                      {item.standards.join(' · ')}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {selectedType && packQuery.isLoading && (
-        <p className="text-sm text-muted-foreground print:hidden">Compiling {selected?.title}…</p>
+        <div className="print:hidden">
+          <LoadingState label={`Compiling ${selected?.title ?? 'report'}…`} />
+        </div>
       )}
 
       {selectedType && packQuery.error && (

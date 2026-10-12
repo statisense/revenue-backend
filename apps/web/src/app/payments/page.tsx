@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type PaymentRequest = {
   id: string;
@@ -77,7 +77,7 @@ export default function PaymentsPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Payments"
         description="Payment requests, links, virtual accounts, and collections"
@@ -118,7 +118,7 @@ export default function PaymentsPage() {
         </Card>
       )}
 
-      {requests.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {requests.isLoading && <LoadingState label="Loading payment requests…" />}
       {requests.error && (
         <ErrorState
           message={requests.error instanceof Error ? requests.error.message : 'Failed'}
@@ -127,6 +127,7 @@ export default function PaymentsPage() {
       )}
       {requests.data && (
         <DataTable
+          searchPlaceholder="Search code, invoice, payer, status…"
           columns={[
             { key: 'code', label: 'Code' },
             { key: 'invoice', label: 'Invoice / payer' },
@@ -137,6 +138,18 @@ export default function PaymentsPage() {
             { key: 'actions', label: 'Actions' },
           ]}
           rows={requests.data.map((p) => ({
+            __id: p.id,
+            __search: [
+              p.paymentCode,
+              p.invoice?.invoiceNumber,
+              p.invoice?.payerName,
+              p.status,
+              p.virtualAccount?.bankName,
+              p.virtualAccount?.accountNumber,
+              p.payments?.[0]?.receipt?.receiptNumber,
+            ]
+              .filter(Boolean)
+              .join(' '),
             code: <span className="font-medium">{p.paymentCode}</span>,
             invoice: (
               <div>

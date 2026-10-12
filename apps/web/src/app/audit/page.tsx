@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { DataTable, ErrorState, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, LoadingState, PageHeader } from '@/components/page-shell';
 
 type AuditPage = {
   items?: AuditItem[];
@@ -33,10 +33,10 @@ export default function AuditPage() {
   });
 
   return (
-    <div>
-      <PageHeader title="Audit" description="Immutable activity log across the platform" />
+    <div className="space-y-6">
+      <PageHeader title="Audit trail" description="Immutable activity log for compliance and investigations" />
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading audit trail…</p>}
+      {isLoading && <LoadingState label="Loading audit trail…" />}
       {error && (
         <ErrorState
           message={error instanceof Error ? error.message : 'Failed to load audit log'}
@@ -45,6 +45,7 @@ export default function AuditPage() {
       )}
       {data && (
         <DataTable
+          searchPlaceholder="Search action, entity, actor, IP…"
           columns={[
             { key: 'when', label: 'When' },
             { key: 'action', label: 'Action' },
@@ -52,13 +53,19 @@ export default function AuditPage() {
             { key: 'actor', label: 'Actor' },
             { key: 'ip', label: 'IP' },
           ]}
-          rows={data.map((row) => ({
-            when: formatDate(row.createdAt),
-            action: <Badge variant="outline">{row.action}</Badge>,
-            entity: `${row.entityType}${row.entityId ? ` · ${row.entityId.slice(0, 8)}` : ''}`,
-            actor: row.actorId?.slice(0, 8) || '—',
-            ip: row.ipAddress || '—',
-          }))}
+          rows={data.map((row) => {
+            const entity = `${row.entityType}${row.entityId ? ` · ${row.entityId.slice(0, 8)}` : ''}`;
+            const actor = row.actorId?.slice(0, 8) || '—';
+            return {
+              __id: row.id,
+              __search: `${row.action} ${entity} ${actor} ${row.ipAddress ?? ''} ${formatDate(row.createdAt)}`,
+              when: formatDate(row.createdAt),
+              action: <Badge variant="outline">{row.action}</Badge>,
+              entity,
+              actor,
+              ip: row.ipAddress || '—',
+            };
+          })}
         />
       )}
     </div>

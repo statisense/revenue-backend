@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type Notification = {
   id: string;
@@ -52,7 +52,7 @@ export default function NotificationsPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Notifications"
         description="SMS, email, WhatsApp, and Telegram delivery log"
@@ -105,12 +105,13 @@ export default function NotificationsPage() {
         </Card>
       )}
 
-      {list.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {list.isLoading && <LoadingState label="Loading notifications…" />}
       {list.error && (
         <ErrorState message={list.error instanceof Error ? list.error.message : 'Failed'} onRetry={() => list.refetch()} />
       )}
       {list.data && (
         <DataTable
+          searchPlaceholder="Search recipient, subject, channel…"
           columns={[
             { key: 'channel', label: 'Channel' },
             { key: 'recipient', label: 'Recipient' },
@@ -119,6 +120,8 @@ export default function NotificationsPage() {
             { key: 'created', label: 'Created' },
           ]}
           rows={list.data.map((n) => ({
+            __id: n.id,
+            __search: `${n.channel} ${n.recipient} ${n.subject ?? ''} ${n.status}`,
             channel: n.channel,
             recipient: n.recipient,
             subject: n.subject ?? '—',

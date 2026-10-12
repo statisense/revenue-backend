@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type Settlement = {
   id: string;
@@ -68,7 +68,7 @@ export default function SettlementsPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Settlements"
         description="Treasury settlement batches and line items"
@@ -104,8 +104,14 @@ export default function SettlementsPage() {
         </Card>
       )}
 
-      <h2 className="mb-3 font-serif text-xl">Batches</h2>
-      {batches.isLoading && <p className="mb-6 text-sm text-muted-foreground">Loading batches…</p>}
+      <div className="mb-3">
+        <div className="mb-1.5 flex items-center gap-2">
+          <div className="h-0.5 w-6 rounded-full bg-gradient-to-r from-brass to-accent" />
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-brass-deep">01 · Batches</p>
+        </div>
+        <h2 className="font-serif text-xl text-navy dark:text-foreground">Settlement batches</h2>
+      </div>
+      {batches.isLoading && <div className="mb-6"><LoadingState label="Loading batches…" /></div>}
       {batches.error && (
         <ErrorState
           message={batches.error instanceof Error ? batches.error.message : 'Failed to load batches'}
@@ -115,6 +121,7 @@ export default function SettlementsPage() {
       {batches.data && (
         <div className="mb-8">
           <DataTable
+            searchPlaceholder="Search batch, status, TSA ref…"
             columns={[
               { key: 'number', label: 'Batch' },
               { key: 'amount', label: 'Total' },
@@ -123,6 +130,8 @@ export default function SettlementsPage() {
               { key: 'actions', label: '' },
             ]}
             rows={batches.data.map((b) => ({
+              __id: b.id,
+              __search: `${b.batchNumber || ''} ${b.id} ${b.status} ${b.tsaReference || ''}`,
               number: b.batchNumber || b.id.slice(0, 8),
               amount: formatMoney(b.totalMinor ?? 0),
               status: (
@@ -142,8 +151,14 @@ export default function SettlementsPage() {
         </div>
       )}
 
-      <h2 className="mb-3 font-serif text-xl">Settlement lines</h2>
-      {settlements.isLoading && <p className="text-sm text-muted-foreground">Loading settlements…</p>}
+      <div className="mb-3">
+        <div className="mb-1.5 flex items-center gap-2">
+          <div className="h-0.5 w-6 rounded-full bg-gradient-to-r from-brass to-accent" />
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-brass-deep">02 · Lines</p>
+        </div>
+        <h2 className="font-serif text-xl text-navy dark:text-foreground">Settlement lines</h2>
+      </div>
+      {settlements.isLoading && <LoadingState label="Loading settlement lines…" />}
       {settlements.error && (
         <ErrorState
           message={settlements.error instanceof Error ? settlements.error.message : 'Failed to load'}
@@ -152,6 +167,7 @@ export default function SettlementsPage() {
       )}
       {settlements.data && (
         <DataTable
+          searchPlaceholder="Search ID, reference, status…"
           columns={[
             { key: 'id', label: 'ID' },
             { key: 'ref', label: 'Reference' },
@@ -160,6 +176,8 @@ export default function SettlementsPage() {
             { key: 'created', label: 'Created' },
           ]}
           rows={settlements.data.map((s) => ({
+            __id: s.id,
+            __search: `${s.id} ${s.paymentReference || ''} ${s.status}`,
             id: s.id.slice(0, 8),
             ref: s.paymentReference || '—',
             amount: formatMoney(s.amountMinor ?? 0),

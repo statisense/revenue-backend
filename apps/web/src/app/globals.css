@@ -118,6 +118,14 @@
   .hairline-top {
     box-shadow: inset 0 1px 0 rgba(184, 154, 79, 0.45);
   }
+
+  .panel-surface {
+    @apply rounded-lg border border-border/90 bg-card/90 shadow-panel backdrop-blur-sm;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 @keyframes fade-up {
@@ -162,7 +170,7 @@
 @media print {
   @page {
     size: A4;
-    margin: 12mm 14mm;
+    margin: 14mm 12mm 16mm;
   }
 
   html,
@@ -190,7 +198,25 @@
     display: block !important;
   }
 
-  /* Prefer page breaks between major report sections */
+  /* Full-bleed report sheet on paper */
+  main {
+    padding: 0 !important;
+    animation: none !important;
+  }
+
+  main > div {
+    max-width: none !important;
+  }
+
+  .report-print-root {
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .report-print-root header {
+    break-after: avoid;
+  }
+
   .report-print-root section {
     break-inside: avoid;
     page-break-inside: avoid;
@@ -198,6 +224,7 @@
 
   .report-print-root table {
     break-inside: auto;
+    font-size: 10.5pt;
   }
 
   .report-print-root tr {
@@ -205,13 +232,24 @@
     page-break-inside: avoid;
   }
 
+  .report-print-root thead {
+    display: table-header-group;
+  }
+
+  .report-print-root tfoot {
+    display: table-footer-group;
+  }
+
   .report-print-root .recharts-wrapper,
   .report-print-root .recharts-surface {
     max-width: 100% !important;
   }
 
-  /* Expand tab-hidden sections when printing (Tailwind print:block backup) */
   .report-print-root section.hidden {
     display: block !important;
+  }
+
+  .report-print-root footer {
+    break-inside: avoid;
   }
 }

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type Refund = {
   id: string;
@@ -70,7 +70,7 @@ export default function RefundsPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Refunds"
         description="Issue refunds against collected payments"
@@ -128,12 +128,13 @@ export default function RefundsPage() {
         </Card>
       )}
 
-      {list.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {list.isLoading && <LoadingState label="Loading refunds…" />}
       {list.error && (
         <ErrorState message={list.error instanceof Error ? list.error.message : 'Failed'} onRetry={() => list.refetch()} />
       )}
       {list.data && (
         <DataTable
+          searchPlaceholder="Search refund, payment, reason…"
           columns={[
             { key: 'id', label: 'Refund' },
             { key: 'payment', label: 'Payment' },
@@ -143,6 +144,8 @@ export default function RefundsPage() {
             { key: 'created', label: 'Created' },
           ]}
           rows={list.data.map((r) => ({
+            __id: r.id,
+            __search: `${r.id} ${r.payment?.providerRef ?? ''} ${r.payment?.id ?? ''} ${r.status} ${r.reason ?? ''}`,
             id: r.id.slice(0, 10),
             payment: r.payment?.providerRef ?? r.payment?.id?.slice(0, 10) ?? '—',
             amount: formatMoney(r.amountMinor),

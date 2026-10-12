@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
 
 type Agency = {
   id: string;
@@ -73,10 +73,10 @@ export default function AgenciesPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Agencies"
-        description="Manage collecting agencies and their profiles"
+        description="Collecting agencies, branches, and institutional profiles"
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? 'Close' : 'Create agency'}
@@ -129,7 +129,7 @@ export default function AgenciesPage() {
         </Card>
       )}
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading agencies…</p>}
+      {isLoading && <LoadingState label="Loading agencies…" />}
       {error && (
         <ErrorState
           message={error instanceof Error ? error.message : 'Failed to load agencies'}
@@ -138,6 +138,7 @@ export default function AgenciesPage() {
       )}
       {data && (
         <DataTable
+          searchPlaceholder="Search code, name, contact, state…"
           columns={[
             { key: 'code', label: 'Code' },
             { key: 'name', label: 'Name' },
@@ -146,6 +147,8 @@ export default function AgenciesPage() {
             { key: 'status', label: 'Status' },
           ]}
           rows={data.map((a) => ({
+            __id: a.id,
+            __search: `${a.code} ${a.name} ${a.email ?? ''} ${a.phone ?? ''} ${a.state ?? ''} ${a.status}`,
             code: <span className="font-medium">{a.code}</span>,
             name: a.name,
             contact: a.email || a.phone || '—',

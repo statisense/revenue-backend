@@ -409,7 +409,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-border/80 bg-card/85 px-3 backdrop-blur-md print:hidden sm:px-4 lg:px-8">
+        <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-border/70 bg-card/90 px-3 shadow-[0_1px_0_rgba(184,154,79,0.12)] backdrop-blur-md print:hidden sm:px-4 lg:px-8">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Button
               variant="outline"
@@ -422,8 +422,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </Button>
             <div className="min-w-0">
               <p className="truncate text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">NCS</span>
-                <span className="mx-1.5 text-border sm:mx-2">·</span>
+                <span className="font-medium text-navy dark:text-foreground">NCS</span>
+                <span className="mx-1.5 text-brass/50 sm:mx-2">·</span>
                 <span className="hidden min-[380px]:inline">Enterprise revenue operations</span>
                 <span className="min-[380px]:hidden">Revenue ops</span>
               </p>
@@ -436,7 +436,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             onLogout={logout}
           />
         </header>
-        <main className="w-full min-w-0 flex-1 animate-fade-up p-3 sm:p-4 lg:p-8">{children}</main>
+        <main className="w-full min-w-0 flex-1 animate-fade-up p-3 sm:p-5 lg:p-8">
+          <div className="mx-auto w-full max-w-[1400px]">{children}</div>
+        </main>
       </div>
     </div>
   );
