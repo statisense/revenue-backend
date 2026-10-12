@@ -75,7 +75,7 @@ try {
   process.exit(42);
 }
 
-// ── REDIS_URL (optional for boot; queues disabled if missing) ─────────────
+// ── REDIS_URL (optional — API boots without Redis; notifications run inline) ─
 let redisUrl = process.env.REDIS_URL || '';
 if (unresolved(redisUrl)) {
   if (process.env.REDISHOST) {
@@ -83,15 +83,21 @@ if (unresolved(redisUrl)) {
     const auth = pass ? `:${encodeURIComponent(pass)}@` : '';
     redisUrl = `redis://${auth}${process.env.REDISHOST}:${process.env.REDISPORT || '6379'}`;
   } else {
-    warnings.push('REDIS_URL missing — add Redis and set REDIS_URL=${{Redis.REDIS_URL}}. Queues disabled.');
-    redisUrl = '';
+    warnings.push('REDIS_URL not set — continuing without Redis (inline notifications).');
+    redisUrl = 'redis://127.0.0.1:6379';
     shellExport('QUEUES_DISABLED', '1');
   }
+} else if (prod) {
+  try {
+    if (isLocal(new URL(redisUrl).hostname)) {
+      warnings.push('REDIS_URL is localhost in production — queues disabled.');
+      shellExport('QUEUES_DISABLED', '1');
+    }
+  } catch (_) {}
 }
-if (redisUrl) shellExport('REDIS_URL', redisUrl);
-else shellExport('REDIS_URL', 'redis://127.0.0.1:6379');
+shellExport('REDIS_URL', redisUrl);
 
-// ── RABBITMQ_URL (optional for boot) ──────────────────────────────────────
+// ── RABBITMQ_URL (optional — not required for API boot) ───────────────────
 let rabbitUrl = process.env.RABBITMQ_URL || '';
 if (unresolved(rabbitUrl)) {
   const user = process.env.RABBITMQ_USER || process.env.RABBITMQ_DEFAULT_USER || 'revenue';
@@ -101,9 +107,8 @@ if (unresolved(rabbitUrl)) {
   if (pass && host && !unresolved(host) && !unresolved(pass)) {
     rabbitUrl = `amqp://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
   } else {
-    warnings.push('RABBITMQ_URL missing — add RabbitMQ service. Messaging disabled.');
+    warnings.push('RABBITMQ_URL not set — continuing without RabbitMQ.');
     rabbitUrl = 'amqp://guest:guest@127.0.0.1:5672';
-    shellExport('QUEUES_DISABLED', '1');
   }
 }
 shellExport('RABBITMQ_URL', rabbitUrl);

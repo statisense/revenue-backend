@@ -9,10 +9,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
-import { AppModule } from './app.module';
 import { loadEnv } from '@revenue/config';
+import { probeRedisOrDisable, areQueuesEnabled } from './common/queues/queues.util';
 
 async function bootstrap() {
+  // Redis/RabbitMQ must never block API boot — probe then optionally disable queues
+  await probeRedisOrDisable();
+
+  const { AppModule } = await import('./app.module');
   const env = loadEnv(process.env);
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
@@ -43,7 +47,9 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);
   // eslint-disable-next-line no-console
-  console.log(`API listening on ${env.API_URL} (port ${port})`);
+  console.log(
+    `API listening on ${env.API_URL} (port ${port}) queues=${areQueuesEnabled() ? 'on' : 'off (inline notifications)'}`,
+  );
 }
 
 bootstrap();

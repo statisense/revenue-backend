@@ -73,6 +73,17 @@ Login: `admin@ncs.gov.ng` / `ChangeMe@12345`
 - Admin: `https://<web>/login`
 - Pay: `https://<web>/pay`
 
+## Redis & RabbitMQ are optional
+
+The API **boots and serves** without Redis or RabbitMQ:
+
+- **Without Redis:** notification jobs run **inline** (no BullMQ). Health shows `"queues":"inline"`.
+- **Without RabbitMQ:** ignored for now (no hard dependency in the API process).
+- **With Redis up:** BullMQ queues are used automatically.
+
+You can add Redis/RabbitMQ later without rewriting the app — just set the URLs and redeploy.
+
 ## Deploy order
 
-MySQL → Redis → RabbitMQ → **revenue-backend** → **revenue-web** → update API CORS/APP_URL → redeploy API
+MySQL → **revenue-backend** → **revenue-web** → update API CORS/APP_URL → redeploy API  
+(Optional anytime: Redis, RabbitMQ)

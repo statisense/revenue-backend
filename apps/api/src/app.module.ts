@@ -29,25 +29,31 @@ import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
+import { areQueuesEnabled } from './common/queues/queues.util';
 
 const env = loadEnv(process.env);
+const queuesOn = areQueuesEnabled();
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvFile: true,
-      load: [() => env],
+      load: [() => ({ ...env, QUEUES_ENABLED: queuesOn })],
     }),
     ThrottlerModule.forRoot([{ ttl: env.RATE_LIMIT_TTL * 1000, limit: env.RATE_LIMIT_LIMIT }]),
-    BullModule.forRoot({
-      connection: {
-        url: env.REDIS_URL,
-        maxRetriesPerRequest: 1,
-        enableOfflineQueue: false,
-        lazyConnect: true,
-      },
-    }),
+    ...(queuesOn
+      ? [
+          BullModule.forRoot({
+            connection: {
+              url: env.REDIS_URL,
+              maxRetriesPerRequest: 1,
+              enableOfflineQueue: false,
+              lazyConnect: true,
+            },
+          }),
+        ]
+      : []),
     PrismaModule,
     AuditModule,
     AuthModule,
@@ -58,9 +64,9 @@ const env = loadEnv(process.env);
     InvoiceModule,
     GatewayModule,
     VirtualAccountModule,
+    NotificationModule.register(),
     PaymentModule,
     SettlementModule,
-    NotificationModule,
     ReportingModule,
     OpsModule,
   ],
