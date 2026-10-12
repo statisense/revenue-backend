@@ -8,7 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "turbo run build",
+    "build": "pnpm --filter @revenue/shared build && pnpm --filter @revenue/config build && pnpm --filter @revenue/database generate && pnpm --filter @revenue/database build && pnpm --filter @revenue/api build",
+    "start": "node scripts/railway-start.cjs",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "test": "turbo run test",
