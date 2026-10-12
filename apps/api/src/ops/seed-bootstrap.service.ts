@@ -34,6 +34,8 @@ export class SeedBootstrapService implements OnModuleInit {
 
     this.seedPromise = (async () => {
       try {
+        await this.patchMissingColumns();
+
         const agencies = await this.prisma.agency.count();
         if (agencies === 0) {
           this.logger.warn('Empty tenant DB — attempting full pnpm seed, then in-process demo seed…');
@@ -69,5 +71,22 @@ export class SeedBootstrapService implements OnModuleInit {
     })();
 
     return this.seedPromise;
+  }
+
+  /** Best-effort column patches when migrate deploy lagged behind Prisma schema. */
+  private async patchMissingColumns() {
+    const statements = [
+      'ALTER TABLE InvoiceLine ADD COLUMN taxRatePercent DECIMAL(7,4) NOT NULL DEFAULT 0',
+      'ALTER TABLE InvoiceLine ADD COLUMN taxMinor INT NOT NULL DEFAULT 0',
+      'ALTER TABLE Invoice ADD COLUMN amountPaidMinor INT NOT NULL DEFAULT 0',
+    ];
+    for (const sql of statements) {
+      try {
+        await this.prisma.$executeRawUnsafe(sql);
+        this.logger.warn(`Applied schema patch: ${sql}`);
+      } catch {
+        // Column already exists or table missing — ignore
+      }
+    }
   }
 }
