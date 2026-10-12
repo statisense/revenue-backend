@@ -28,7 +28,9 @@ ENV NODE_ENV=production
 ENV PORT=4000
 COPY --from=build /app /app
 COPY infra/docker/api-entrypoint.sh /app/infra/docker/api-entrypoint.sh
+COPY scripts/railway-start.cjs /app/scripts/railway-start.cjs
 RUN chmod +x /app/infra/docker/api-entrypoint.sh \
   && sed -i 's/\r$//' /app/infra/docker/api-entrypoint.sh
 EXPOSE 4000
-CMD ["/app/infra/docker/api-entrypoint.sh"]
+# Use diagnostic-capable start so missing DB/Redis/RabbitMQ returns 503 JSON instead of Railway 502
+CMD ["node", "scripts/railway-start.cjs"]

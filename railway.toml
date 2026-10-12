@@ -19,7 +19,7 @@ watchPatterns = [
 ]
 
 [deploy]
-startCommand = "/app/infra/docker/api-entrypoint.sh"
+startCommand = "node scripts/railway-start.cjs"
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
