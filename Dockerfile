@@ -1,3 +1,5 @@
+# Root Dockerfile — same as API image (Railway may auto-detect /Dockerfile)
+# Prefer config-as-code: infra/docker/Dockerfile.api via railway.toml
 # syntax=docker/dockerfile:1
 FROM node:20-bookworm-slim AS base
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate \
@@ -32,5 +34,4 @@ COPY scripts/railway-start.cjs /app/scripts/railway-start.cjs
 RUN chmod +x /app/infra/docker/api-entrypoint.sh \
   && sed -i 's/\r$//' /app/infra/docker/api-entrypoint.sh
 EXPOSE 4000
-# Use diagnostic-capable start so missing DB/Redis/RabbitMQ returns 503 JSON instead of Railway 502
-CMD ["node", "scripts/railway-start.cjs"]
+CMD ["/app/infra/docker/api-entrypoint.sh"]

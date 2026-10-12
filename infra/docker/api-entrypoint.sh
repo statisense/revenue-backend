@@ -1,125 +1,136 @@
 #!/bin/sh
 set -eu
 
-# ── DATABASE_URL (Railway MySQL plugin, Render private MySQL, or explicit) ──
-if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "auto" ]; then
-  if [ -n "${MYSQL_URL:-}" ]; then
-    export DATABASE_URL="$MYSQL_URL"
-  else
-    DATABASE_URL="$(
-      node -e "
-        const user = process.env.MYSQLUSER || process.env.MYSQL_USER || 'revenue';
-        const pass = process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD || '';
-        const host = process.env.MYSQLHOST || process.env.MYSQL_HOST || 'revenue-mysql';
-        const port = process.env.MYSQLPORT || process.env.MYSQL_PORT || '3306';
-        const db = process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE || 'revenue';
-        if (!pass) {
-          console.error('Set DATABASE_URL, MYSQL_URL, or MYSQLPASSWORD/MYSQL_PASSWORD');
-          process.exit(1);
-        }
-        const u = encodeURIComponent(user);
-        const p = encodeURIComponent(pass);
-        process.stdout.write(\`mysql://\${u}:\${p}@\${host}:\${port}/\${db}\`);
-      "
-    )"
-    export DATABASE_URL
-  fi
+# Resolve DATABASE_URL / REDIS_URL / RABBITMQ_URL for Railway, then migrate + start.
+# Rejects local .env hosts (127.0.0.1:3316) in production.
+
+resolve_env() {
+  node <<'NODE'
+const { URL } = require('url');
+
+function isLocal(host) {
+  return !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+
+function shellExport(name, value) {
+  // Safe single-quote escaping for eval
+  const v = String(value).replace(/'/g, `'\"'\"'`);
+  process.stdout.write(`export ${name}='${v}'\n`);
+}
+
+const prod = process.env.NODE_ENV === 'production';
+
+// ── DATABASE_URL ──────────────────────────────────────────────────────────
+let dbUrl = process.env.DATABASE_URL || '';
+let dbHost = '';
+try {
+  if (dbUrl && dbUrl !== 'auto') dbHost = new URL(dbUrl).hostname;
+} catch (_) {
+  dbUrl = '';
+}
+
+const mysqlPluginUrl = process.env.MYSQL_URL || '';
+const mysqlHost = process.env.MYSQLHOST || process.env.MYSQL_HOST || '';
+const mysqlPort = process.env.MYSQLPORT || process.env.MYSQL_PORT || '3306';
+const mysqlUser = process.env.MYSQLUSER || process.env.MYSQL_USER || 'revenue';
+const mysqlPass = process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD || '';
+const mysqlDb = process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE || 'revenue';
+
+if (!dbUrl || dbUrl === 'auto' || (prod && isLocal(dbHost))) {
+  if (mysqlPluginUrl) {
+    dbUrl = mysqlPluginUrl;
+    console.error(`[entrypoint] Using MYSQL_URL (replaced local/missing DATABASE_URL host=${dbHost || 'none'})`);
+  } else if (mysqlHost && mysqlPass) {
+    dbUrl = `mysql://${encodeURIComponent(mysqlUser)}:${encodeURIComponent(mysqlPass)}@${mysqlHost}:${mysqlPort}/${mysqlDb}`;
+    console.error(`[entrypoint] Built DATABASE_URL from MYSQLHOST=${mysqlHost}`);
+  } else if (prod && isLocal(dbHost)) {
+    console.error('');
+    console.error('FATAL: DATABASE_URL points at localhost (e.g. 127.0.0.1:3316).');
+    console.error('That only works on your laptop — not on Railway.');
+    console.error('');
+    console.error('Fix in Railway → revenue-backend → Variables:');
+    console.error('  1. Add a MySQL database service to this project');
+    console.error('  2. Set DATABASE_URL=${{MySQL.MYSQL_URL}}');
+    console.error('     (use your exact MySQL service name if different)');
+    console.error('  3. Remove any DATABASE_URL with 127.0.0.1 or localhost');
+    console.error('');
+    process.exit(42);
+  } else if (!dbUrl || dbUrl === 'auto') {
+    console.error('FATAL: DATABASE_URL is required');
+    process.exit(42);
+  }
+}
+shellExport('DATABASE_URL', dbUrl);
+
+try {
+  const u = new URL(dbUrl);
+  shellExport('MYSQL_WAIT_HOST', u.hostname);
+  shellExport('MYSQL_WAIT_PORT', u.port || '3306');
+} catch (e) {
+  console.error('FATAL: invalid DATABASE_URL', e.message);
+  process.exit(42);
+}
+
+// ── REDIS_URL ─────────────────────────────────────────────────────────────
+let redisUrl = process.env.REDIS_URL || '';
+if (!redisUrl || redisUrl === 'auto') {
+  if (process.env.REDISHOST) {
+    const pass = process.env.REDISPASSWORD || '';
+    const auth = pass ? `:${encodeURIComponent(pass)}@` : '';
+    redisUrl = `redis://${auth}${process.env.REDISHOST}:${process.env.REDISPORT || '6379'}`;
+  } else {
+    console.error('FATAL: REDIS_URL is required. Add Redis and set REDIS_URL=${{Redis.REDIS_URL}}');
+    process.exit(42);
+  }
+}
+shellExport('REDIS_URL', redisUrl);
+
+// ── RABBITMQ_URL ──────────────────────────────────────────────────────────
+let rabbitUrl = process.env.RABBITMQ_URL || '';
+if (!rabbitUrl || rabbitUrl === 'auto') {
+  const user = process.env.RABBITMQ_USER || process.env.RABBITMQ_DEFAULT_USER || 'revenue';
+  const pass = process.env.RABBITMQ_PASS || process.env.RABBITMQ_DEFAULT_PASS || '';
+  const host = process.env.RABBITMQ_HOST || process.env.RABBITMQHOST || '';
+  const port = process.env.RABBITMQ_PORT || '5672';
+  if (!pass || !host) {
+    console.error('FATAL: RABBITMQ_URL is required (or RABBITMQ_HOST + password)');
+    process.exit(42);
+  }
+  rabbitUrl = `amqp://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
+}
+shellExport('RABBITMQ_URL', rabbitUrl);
+
+// ── API_URL ───────────────────────────────────────────────────────────────
+let apiUrl = process.env.API_URL || '';
+if (!apiUrl || apiUrl === 'auto') {
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) apiUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  else if (process.env.RENDER_EXTERNAL_URL) apiUrl = process.env.RENDER_EXTERNAL_URL;
+  else apiUrl = `http://localhost:${process.env.PORT || 4000}`;
+}
+shellExport('API_URL', apiUrl);
+NODE
+}
+
+if ! EVAL_OUT="$(resolve_env)"; then
+  echo "Env resolution failed — starting diagnostic server"
+  exec node /app/scripts/railway-start.cjs
 fi
+eval "$EVAL_OUT"
 
-# ── REDIS_URL (Railway Redis plugin usually injects this) ───────────────────
-if [ -z "${REDIS_URL:-}" ] || [ "${REDIS_URL}" = "auto" ]; then
-  if [ -n "${REDISHOST:-}" ]; then
-    REDIS_URL="$(
-      node -e "
-        const h = process.env.REDISHOST;
-        const port = process.env.REDISPORT || '6379';
-        const pass = process.env.REDISPASSWORD || '';
-        const auth = pass ? \`:\${encodeURIComponent(pass)}@\` : '';
-        process.stdout.write(\`redis://\${auth}\${h}:\${port}\`);
-      "
-    )"
-    export REDIS_URL
-  else
-    echo "REDIS_URL is required (link a Railway Redis service or set REDIS_URL)"
-    exit 1
-  fi
-fi
-
-# ── RABBITMQ_URL ────────────────────────────────────────────────────────────
-if [ -z "${RABBITMQ_URL:-}" ] || [ "${RABBITMQ_URL}" = "auto" ]; then
-  RABBITMQ_URL="$(
-    node -e "
-      const u = encodeURIComponent(process.env.RABBITMQ_USER || process.env.RABBITMQ_DEFAULT_USER || 'revenue');
-      const p = encodeURIComponent(process.env.RABBITMQ_PASS || process.env.RABBITMQ_DEFAULT_PASS || '');
-      const h = process.env.RABBITMQ_HOST || process.env.RABBITMQHOST || 'revenue-rabbitmq';
-      const port = process.env.RABBITMQ_PORT || '5672';
-      if (!p) {
-        console.error('Set RABBITMQ_URL or RABBITMQ_PASS / RABBITMQ_DEFAULT_PASS');
-        process.exit(1);
-      }
-      process.stdout.write(\`amqp://\${u}:\${p}@\${h}:\${port}\`);
-    "
-  )"
-  export RABBITMQ_URL
-fi
-
-# ── Public API URL ──────────────────────────────────────────────────────────
-if [ -z "${API_URL:-}" ] || [ "${API_URL}" = "auto" ]; then
-  if [ -n "${RAILWAY_PUBLIC_DOMAIN:-}" ]; then
-    export API_URL="https://${RAILWAY_PUBLIC_DOMAIN}"
-  elif [ -n "${RENDER_EXTERNAL_URL:-}" ]; then
-    export API_URL="$RENDER_EXTERNAL_URL"
-  else
-    export API_URL="http://localhost:${PORT:-4000}"
-  fi
-fi
-
-# Resolve MySQL host for readiness probe
-MYSQL_WAIT_HOST="$(
-  node -e "
-    if (process.env.MYSQLHOST || process.env.MYSQL_HOST) {
-      process.stdout.write(process.env.MYSQLHOST || process.env.MYSQL_HOST);
-      process.exit(0);
-    }
-    try {
-      const u = new URL(process.env.DATABASE_URL);
-      process.stdout.write(u.hostname);
-    } catch {
-      process.stdout.write('127.0.0.1');
-    }
-  "
-)"
-MYSQL_WAIT_PORT="$(
-  node -e "
-    if (process.env.MYSQLPORT || process.env.MYSQL_PORT) {
-      process.stdout.write(process.env.MYSQLPORT || process.env.MYSQL_PORT);
-      process.exit(0);
-    }
-    try {
-      const u = new URL(process.env.DATABASE_URL);
-      process.stdout.write(u.port || '3306');
-    } catch {
-      process.stdout.write('3306');
-    }
-  "
-)"
-
-echo "Waiting for MySQL at ${MYSQL_WAIT_HOST}:${MYSQL_WAIT_PORT} ..."
+echo "Using MySQL at ${MYSQL_WAIT_HOST}:${MYSQL_WAIT_PORT}"
+echo "Waiting for MySQL..."
 i=0
 until MYSQL_WAIT_HOST="$MYSQL_WAIT_HOST" MYSQL_WAIT_PORT="$MYSQL_WAIT_PORT" node -e "
   const net = require('net');
   const host = process.env.MYSQL_WAIT_HOST;
   const port = Number(process.env.MYSQL_WAIT_PORT || 3306);
-  const socket = net.connect({ host, port }, () => {
-    socket.end();
-    process.exit(0);
-  });
+  const socket = net.connect({ host, port }, () => { socket.end(); process.exit(0); });
   socket.on('error', () => process.exit(1));
   setTimeout(() => process.exit(1), 2000);
 " >/dev/null 2>&1; do
   i=$((i + 1))
-  if [ "$i" -gt 30 ]; then
-    echo "MySQL did not become ready — starting diagnostic server instead of crashing"
+  if [ "$i" -gt 45 ]; then
+    echo "MySQL did not become ready at ${MYSQL_WAIT_HOST}:${MYSQL_WAIT_PORT}"
     exec node /app/scripts/railway-start.cjs
   fi
   sleep 2
