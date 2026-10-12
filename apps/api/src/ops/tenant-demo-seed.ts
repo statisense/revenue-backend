@@ -25,8 +25,11 @@ function sha256(value: string) {
  * Creates NCS agency, SUPER_ADMIN role, catalog rows, and demo payments for a rich dashboard.
  */
 export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
-  const existing = await prisma.agency.count();
-  if (existing > 0) return;
+  const ncs = await prisma.agency.findUnique({ where: { code: 'NCS' } });
+  if (ncs) {
+    const paymentCount = await prisma.payment.count({ where: { agencyId: ncs.id } });
+    if (paymentCount > 0) return;
+  }
 
   for (const code of PERMISSIONS) {
     const [module] = code.split(':');
@@ -48,8 +51,14 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
     create: { code: 'NGN', name: 'Nigerian Naira', symbol: '₦', decimals: 2 },
   });
 
-  await prisma.agency.create({
-    data: {
+  await prisma.agency.upsert({
+    where: { code: 'NCS' },
+    update: {
+      name: 'Nigeria Customs',
+      shortName: 'NCS',
+      status: 'ACTIVE',
+    },
+    create: {
       id: AGENCY_ID,
       code: 'NCS',
       name: 'Nigeria Customs',
@@ -64,18 +73,21 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
     },
   });
 
+  const agency = await prisma.agency.findUniqueOrThrow({ where: { code: 'NCS' } });
+  const agencyId = agency.id;
+
   await prisma.branch.createMany({
     data: [
       {
         id: 'ncs-branch-hq',
-        agencyId: AGENCY_ID,
+        agencyId,
         code: 'HQ',
         name: 'Headquarters (Lagos)',
         state: 'Lagos',
       },
       {
         id: 'ncs-branch-apapa',
-        agencyId: AGENCY_ID,
+        agencyId,
         code: 'APAPA',
         name: 'Apapa Port',
         state: 'Lagos',
@@ -126,10 +138,12 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
     create: { userId: 'ncs-user-admin', roleId: ROLE_SUPER },
   });
 
-  await prisma.revenueCategory.create({
-    data: {
+  await prisma.revenueCategory.upsert({
+    where: { id: CAT_PORT },
+    update: { name: 'Port Charges', agencyId },
+    create: {
       id: CAT_PORT,
-      agencyId: AGENCY_ID,
+      agencyId,
       code: 'PORT',
       name: 'Port Charges',
     },
@@ -138,7 +152,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
     data: [
       {
         id: TYPE_WHARF,
-        agencyId: AGENCY_ID,
+        agencyId,
         categoryId: CAT_PORT,
         code: 'WHARFAGE',
         name: 'Wharfage Dues',
@@ -146,7 +160,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
       },
       {
         id: TYPE_CARGO,
-        agencyId: AGENCY_ID,
+        agencyId,
         categoryId: CAT_PORT,
         code: 'CARGO_DUES',
         name: 'Cargo Dues',
@@ -192,7 +206,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
       update: {},
       create: {
         id: invoiceId,
-        agencyId: AGENCY_ID,
+        agencyId,
         invoiceNumber: `NCS-DEMO-${i.toString().padStart(4, '0')}`,
         payerName: 'Demo Shipping Ltd',
         payerEmail: 'payer@example.com',
@@ -233,7 +247,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
       update: {},
       create: {
         id: prId,
-        agencyId: AGENCY_ID,
+        agencyId,
         invoiceId,
         paymentCode: code,
         paymentReference: `NCS-PR-DEMO-${i}`,
@@ -255,7 +269,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
         update: {},
         create: {
           id: payId,
-          agencyId: AGENCY_ID,
+          agencyId,
           paymentRequestId: prId,
           invoiceId,
           provider: PaymentProvider.PAYSTACK,
@@ -279,7 +293,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
       update: { status: SettlementStatus.PENDING },
       create: {
         id: 'ncs-demo-settlement-pending',
-        agencyId: AGENCY_ID,
+        agencyId,
         paymentId: firstPaidPaymentId,
         amountMinor: 2_500_000_00,
         currency: 'NGN',
