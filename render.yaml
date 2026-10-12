@@ -1,18 +1,20 @@
-# Render Blueprint — API + MySQL + Redis + RabbitMQ
+# Render Blueprint — fullstack Government Revenue Platform
 # Docs: https://render.com/docs/blueprint-spec
 #
-# Deploy: Dashboard → New → Blueprint → connect this repo → apply.
-# After first deploy, open the API URL + /docs and /api/v1/health
+# Deploy: Dashboard → New → Blueprint → connect statisense/revenue-backend → apply.
+#
+# IMPORTANT: Render does NOT support Railway ${{Service.VAR}} syntax.
+# Use fromService links below (or set MYSQL_HOST / MYSQL_PASSWORD manually).
 
 services:
-  # ── Redis (Render Key Value) ───────────────────────────────────────────────
+  # ── Redis (optional for app boot; used when present) ───────────────────────
   - type: keyvalue
     name: revenue-redis
     plan: free
-    ipAllowList: [] # private network only
+    ipAllowList: []
     maxmemoryPolicy: noeviction
 
-  # ── MySQL 8 (private service + disk) ───────────────────────────────────────
+  # ── MySQL 8 (private + disk — Starter plan required) ───────────────────────
   - type: pserv
     name: revenue-mysql
     runtime: docker
@@ -33,24 +35,7 @@ services:
       - key: MYSQL_ROOT_PASSWORD
         generateValue: true
 
-  # ── RabbitMQ (private service + disk) ──────────────────────────────────────
-  - type: pserv
-    name: revenue-rabbitmq
-    runtime: docker
-    plan: starter
-    dockerfilePath: ./infra/docker/Dockerfile.rabbitmq
-    dockerContext: .
-    disk:
-      name: revenue-rabbitmq-data
-      mountPath: /var/lib/rabbitmq
-      sizeGB: 5
-    envVars:
-      - key: RABBITMQ_DEFAULT_USER
-        value: revenue
-      - key: RABBITMQ_DEFAULT_PASS
-        generateValue: true
-
-  # ── NestJS API (public web service) ────────────────────────────────────────
+  # ── NestJS API ─────────────────────────────────────────────────────────────
   - type: web
     name: revenue-api
     runtime: docker
@@ -65,9 +50,8 @@ services:
         value: api/v1
       - key: API_URL
         value: auto
+      # Build DATABASE_URL from MYSQL_* (do NOT paste Railway ${{...}} here)
       - key: DATABASE_URL
-        value: auto
-      - key: RABBITMQ_URL
         value: auto
       - key: TENANT_AGENCY_CODE
         value: NCS
@@ -79,18 +63,16 @@ services:
         value: console
       - key: WHATSAPP_PROVIDER
         value: console
+      - key: SEED_ON_BOOT
+        value: "false"
 
-      # Wired from sibling services
-      - key: REDIS_URL
-        fromService:
-          name: revenue-redis
-          type: keyvalue
-          property: connectionString
       - key: MYSQL_HOST
         fromService:
           name: revenue-mysql
           type: pserv
           property: host
+      - key: MYSQL_PORT
+        value: "3306"
       - key: MYSQL_USER
         value: revenue
       - key: MYSQL_DATABASE
@@ -100,20 +82,13 @@ services:
           name: revenue-mysql
           type: pserv
           envVarKey: MYSQL_PASSWORD
-      - key: RABBITMQ_HOST
-        fromService:
-          name: revenue-rabbitmq
-          type: pserv
-          property: host
-      - key: RABBITMQ_USER
-        value: revenue
-      - key: RABBITMQ_PASS
-        fromService:
-          name: revenue-rabbitmq
-          type: pserv
-          envVarKey: RABBITMQ_DEFAULT_PASS
 
-      # Secrets (auto-generated where length is enough)
+      - key: REDIS_URL
+        fromService:
+          name: revenue-redis
+          type: keyvalue
+          property: connectionString
+
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
@@ -121,12 +96,40 @@ services:
       - key: HMAC_PAYMENT_SECRET
         generateValue: true
 
-      # Prompted in the Render Dashboard on first Blueprint apply
+      # Must be 64+ hex chars — set in dashboard: openssl rand -hex 32
       - key: FIELD_ENCRYPTION_KEY
         sync: false
+
+      # Point these at the Web service URL after revenue-web is live
       - key: APP_URL
         sync: false
       - key: PAY_URL
         sync: false
       - key: CORS_ORIGINS
+        sync: false
+
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+
+  # ── Next.js Web (admin + /pay) ─────────────────────────────────────────────
+  - type: web
+    name: revenue-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./infra/docker/Dockerfile.web
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: HOSTNAME
+        value: "0.0.0.0"
+      - key: NEXT_PUBLIC_AUTO_LOGIN
+        value: "false"
+      # Baked at build time — must include /api/v1, e.g. https://revenue-backend-q2kk.onrender.com/api/v1
+      - key: NEXT_PUBLIC_API_URL
         sync: false

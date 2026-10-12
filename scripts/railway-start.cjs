@@ -34,12 +34,10 @@ const payload = {
     API_URL: process.env.API_URL || null,
   },
   fix: [
-    'Confirm a MySQL service named exactly MySQL exists in this project',
-    'On revenue-backend set DATABASE_URL=${{MySQL.MYSQL_URL}} with NO quotes around the value',
-    'Or set DATABASE_URL by Variable Reference picker → MySQL → MYSQL_URL',
-    'Add Redis + set REDIS_URL=${{Redis.REDIS_URL}}',
-    'Add RabbitMQ + set RABBITMQ_URL',
-    'Redeploy after saving variables',
+    'RENDER: set DATABASE_URL=auto and MYSQL_HOST / MYSQL_USER / MYSQL_PASSWORD / MYSQL_DATABASE (from revenue-mysql). Do NOT use Railway ${{MySQL.MYSQL_URL}} — Render leaves it literal.',
+    'RAILWAY: set DATABASE_URL=${{MySQL.MYSQL_URL}} with the exact MySQL service name.',
+    'Redis/RabbitMQ are optional; API can boot without them.',
+    'Redeploy after fixing variables.',
   ],
 };
 

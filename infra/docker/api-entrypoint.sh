@@ -21,7 +21,9 @@ function isLocal(host) {
   return !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
 }
 function unresolved(v) {
-  return !v || v === 'auto' || String(v).includes('${{');
+  const s = String(v || '');
+  // Railway ${{...}} is NOT expanded on Render — treat as missing
+  return !s || s === 'auto' || s.includes('${{') || s.includes('}}');
 }
 function shellExport(name, value) {
   const v = String(value).replace(/'/g, `'\"'\"'`);
@@ -56,8 +58,15 @@ if (!dbUrl || (prod && isLocal(dbHost))) {
     dbUrl = `mysql://${encodeURIComponent(mysqlUser)}:${encodeURIComponent(mysqlPass)}@${mysqlHost}:${mysqlPort}/${mysqlDb}`;
     console.error(`[entrypoint] Built DATABASE_URL from MYSQLHOST=${mysqlHost}`);
   } else {
-    console.error('FATAL: DATABASE_URL missing or still localhost.');
-    console.error('Add MySQL service and set DATABASE_URL=${{MySQL.MYSQL_URL}} (no quotes, no 127.0.0.1).');
+    console.error('FATAL: DATABASE_URL missing, localhost, or unexpanded ${{...}} (Railway syntax).');
+    console.error('On Render set:');
+    console.error('  DATABASE_URL=auto');
+    console.error('  MYSQL_HOST=<internal host of revenue-mysql>');
+    console.error('  MYSQL_USER=revenue');
+    console.error('  MYSQL_PASSWORD=<mysql password>');
+    console.error('  MYSQL_DATABASE=revenue');
+    console.error('  MYSQL_PORT=3306');
+    console.error('Do NOT use Railway ${{MySQL.MYSQL_URL}} on Render — it is left as a literal string.');
     process.exit(42);
   }
 }
