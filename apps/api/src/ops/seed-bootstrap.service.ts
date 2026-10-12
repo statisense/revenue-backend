@@ -31,34 +31,31 @@ export class SeedBootstrapService implements OnModuleInit {
     this.seedPromise = (async () => {
       try {
         const agencies = await this.prisma.agency.count();
-        if (agencies > 0) {
-          this.logger.log(`Tenant already seeded (${agencies} agency row(s))`);
-          return;
+        if (agencies === 0) {
+          this.logger.warn('Empty tenant DB — attempting full pnpm seed, then in-process demo seed…');
+          try {
+            const { stdout, stderr } = await execFileAsync(
+              'pnpm',
+              ['--filter', '@revenue/database', 'seed'],
+              {
+                cwd: process.cwd(),
+                env: process.env,
+                timeout: 300_000,
+                maxBuffer: 8 * 1024 * 1024,
+              },
+            );
+            if (stdout) this.logger.log(stdout.slice(-1500));
+            if (stderr) this.logger.warn(stderr.slice(-800));
+          } catch (err) {
+            this.logger.warn(`pnpm seed unavailable: ${(err as Error).message}`);
+          }
         }
 
-        this.logger.warn('Empty tenant DB — attempting full pnpm seed, then in-process demo seed…');
-
-        try {
-          const { stdout, stderr } = await execFileAsync(
-            'pnpm',
-            ['--filter', '@revenue/database', 'seed'],
-            {
-              cwd: process.cwd(),
-              env: process.env,
-              timeout: 300_000,
-              maxBuffer: 8 * 1024 * 1024,
-            },
-          );
-          if (stdout) this.logger.log(stdout.slice(-1500));
-          if (stderr) this.logger.warn(stderr.slice(-800));
-        } catch (err) {
-          this.logger.warn(`pnpm seed unavailable: ${(err as Error).message}`);
-        }
-
-        // Always ensure at least demo tenant data (no-ops if agency already created)
+        // No-ops when NCS already has payments; otherwise creates/backfills demo data
         await seedTenantDemoData(this.prisma);
         const after = await this.prisma.agency.count();
-        this.logger.log(`Seed complete — agency rows: ${after}`);
+        const pays = await this.prisma.payment.count();
+        this.logger.log(`Seed ensure complete — agencies=${after} payments=${pays}`);
       } catch (err) {
         this.logger.error(`Auto-seed failed: ${(err as Error).message}`);
       } finally {
