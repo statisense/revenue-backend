@@ -50,6 +50,9 @@ export function clearSession() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem('revenue_hr_ctx');
+  localStorage.removeItem('revenue_hr_profile');
+  localStorage.removeItem('revenue_hr_meta');
 }
 
 export function isAuthenticated(): boolean {

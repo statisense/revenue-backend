@@ -8,6 +8,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { ApiKeyStrategy } from './strategies/api-key.strategy';
 import { UsersModule } from '../users/users.module';
 import { CryptoService } from '../common/services/crypto.service';
+import { HrStaffClient } from './hr-staff.client';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { CryptoService } from '../common/services/crypto.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, ApiKeyStrategy, CryptoService],
+  providers: [AuthService, JwtStrategy, ApiKeyStrategy, CryptoService, HrStaffClient],
   exports: [AuthService, JwtModule, CryptoService],
 })
 export class AuthModule {}

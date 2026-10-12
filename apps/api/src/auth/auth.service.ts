@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -13,6 +14,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CryptoService } from '../common/services/crypto.service';
 import { LoginDto, OAuthTokenDto } from './dto/auth.dto';
+import { HrSsoDto } from './dto/hr-sso.dto';
+import { decodeHrCtxClaims, HrStaffClient } from './hr-staff.client';
 
 const passwordResetTokens = new Map<string, { userId: string; expiresAt: number }>();
 
@@ -24,6 +27,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly audit: AuditService,
     private readonly crypto: CryptoService,
+    private readonly hrStaff: HrStaffClient,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -84,6 +88,198 @@ export class AuthService {
       userAgent: meta?.userAgent,
     });
     return { requires2fa: false as const, ...tokens, user: this.sanitizeUser(user) };
+  }
+
+  /**
+   * Basement / NCAA HR SSO: validate ctx via HR staff API, upsert local admin, issue app JWTs.
+   */
+  async hrSso(dto: HrSsoDto, meta?: { ip?: string; userAgent?: string }) {
+    if (this.config.get<boolean>('HR_SSO_ENABLED') === false) {
+      throw new ServiceUnavailableException('HR SSO is disabled');
+    }
+
+    const companyId = String(dto.company_id).trim();
+    const staffId = String(dto.staff_id).trim();
+    if (!dto.ctx?.trim() || !companyId || !staffId) {
+      throw new BadRequestException('ctx, company_id, and staff_id are required');
+    }
+
+    const claims = decodeHrCtxClaims(dto.ctx);
+    if (claims.expire != null) {
+      // HR tokens may use unix seconds or milliseconds
+      const expMs = claims.expire > 1_000_000_000_000 ? claims.expire : claims.expire * 1000;
+      if (expMs < Date.now()) {
+        throw new UnauthorizedException('HR token has expired');
+      }
+    }
+    if (claims.staffId && claims.staffId !== staffId) {
+      throw new UnauthorizedException('staff_id does not match HR token claims');
+    }
+    if (claims.companyId && claims.companyId !== companyId) {
+      throw new UnauthorizedException('company_id does not match HR token claims');
+    }
+
+    const staff = await this.hrStaff.fetchStaff({
+      ctx: dto.ctx.trim(),
+      companyId,
+      staffId,
+    });
+
+    const user = await this.upsertHrSsoUser(staff);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date(), status: 'ACTIVE' },
+    });
+
+    const tokens = await this.issueTokens(user.id);
+    const hydrated = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      include: {
+        roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+      },
+    });
+
+    await this.audit.log({
+      agencyId: hydrated.agencyId,
+      actorId: hydrated.id,
+      action: AuditAction.LOGIN,
+      entityType: 'User',
+      entityId: hydrated.id,
+      ipAddress: meta?.ip,
+      userAgent: meta?.userAgent,
+      metadata: {
+        event: 'hr_sso_login',
+        companyId,
+        staffId,
+        from: dto.from ?? null,
+      },
+    });
+
+    return {
+      requires2fa: false as const,
+      ...tokens,
+      user: this.sanitizeUser(hydrated),
+      hr: {
+        ctx: dto.ctx.trim(),
+        companyId,
+        staffId,
+        from: dto.from ?? null,
+        profile: staff.raw,
+      },
+    };
+  }
+
+  private async upsertHrSsoUser(staff: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    staffId: string;
+    companyId: string;
+  }) {
+    const employeeNo = `hr:${staff.companyId}:${staff.staffId}`;
+    const grantSuperAdmin = this.config.get<boolean>('HR_SSO_GRANT_SUPER_ADMIN') !== false;
+    const agencyCode = this.config.get<string>('TENANT_AGENCY_CODE', 'NCS');
+    const agency = await this.prisma.agency.findFirst({ where: { code: agencyCode } });
+
+    const existingProfile = await this.prisma.officerProfile.findFirst({
+      where: { employeeNo },
+      include: {
+        user: {
+          include: {
+            roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+          },
+        },
+      },
+    });
+
+    let user =
+      existingProfile?.user ??
+      (await this.prisma.user.findUnique({
+        where: { email: staff.email.toLowerCase() },
+        include: {
+          roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        },
+      }));
+
+    if (!user) {
+      const passwordHash = await argon2.hash(randomBytes(32).toString('base64url'));
+      user = await this.prisma.user.create({
+        data: {
+          email: staff.email.toLowerCase(),
+          passwordHash,
+          firstName: staff.firstName.slice(0, 80),
+          lastName: staff.lastName.slice(0, 80),
+          phone: staff.phone?.slice(0, 40),
+          status: 'ACTIVE',
+          isSuperAdmin: grantSuperAdmin,
+          agencyId: grantSuperAdmin ? null : agency?.id ?? null,
+          emailVerifiedAt: new Date(),
+        },
+        include: {
+          roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        },
+      });
+    } else {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          firstName: staff.firstName.slice(0, 80),
+          lastName: staff.lastName.slice(0, 80),
+          phone: staff.phone?.slice(0, 40) ?? user.phone,
+          status: 'ACTIVE',
+          isSuperAdmin: grantSuperAdmin ? true : user.isSuperAdmin,
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+        },
+        include: {
+          roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        },
+      });
+    }
+
+    if (agency) {
+      await this.prisma.officerProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          employeeNo,
+          title: 'HR SSO Admin',
+          agencyId: agency.id,
+        },
+        create: {
+          userId: user.id,
+          agencyId: agency.id,
+          employeeNo,
+          title: 'HR SSO Admin',
+        },
+      });
+    } else {
+      // Still stamp employeeNo when tenant agency is missing so re-entry is stable.
+      const existing = await this.prisma.officerProfile.findUnique({ where: { userId: user.id } });
+      if (existing) {
+        await this.prisma.officerProfile.update({
+          where: { userId: user.id },
+          data: { employeeNo, title: 'HR SSO Admin' },
+        });
+      }
+    }
+
+    if (grantSuperAdmin) {
+      const superRole = await this.prisma.role.findFirst({
+        where: { code: 'SUPER_ADMIN', agencyId: null },
+      });
+      if (superRole) {
+        const already = await this.prisma.userRole.findUnique({
+          where: { userId_roleId: { userId: user.id, roleId: superRole.id } },
+        });
+        if (!already) {
+          await this.prisma.userRole.create({
+            data: { userId: user.id, roleId: superRole.id },
+          });
+        }
+      }
+    }
+
+    return user;
   }
 
   async refresh(refreshToken: string) {

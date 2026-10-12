@@ -1,6 +1,28 @@
 # Deploy on Render
 
-Live API example: `https://revenue-backend-q2kk.onrender.com`
+## Live frontend (admin + /pay) → Railway API
+
+| Piece | URL |
+|-------|-----|
+| **Web** | https://revenue-web-uwcy.onrender.com |
+| **API** | https://revenue-backend-production-9be7.up.railway.app |
+
+### HR SSO deep-link
+
+`https://revenue-web-uwcy.onrender.com/?ctx=<jwt>&cid=1&stid=1&from=basement`  
+→ web calls Railway `POST /api/v1/auth/hr-sso` → HR staff API → admin session.
+
+Web was created with `scripts/render-add-web.mjs` (`Dockerfile.web`, free plan).
+
+On **Railway** `revenue-backend` set (then redeploy):
+
+```text
+APP_URL=https://revenue-web-uwcy.onrender.com
+PAY_URL=https://revenue-web-uwcy.onrender.com
+CORS_ORIGINS=https://revenue-web-uwcy.onrender.com
+```
+
+Live API example (Render, optional): `https://revenue-backend-q2kk.onrender.com`
 
 ## Critical: Render ≠ Railway env syntax
 
@@ -11,9 +33,24 @@ Live API example: `https://revenue-backend-q2kk.onrender.com`
 
 If health JSON shows `"DATABASE_URL_prefix": "${{MySQL.MYSQL_URL}}"`, Render did **not** expand it — fix the variables below.
 
+## Add MySQL (Docker private service) via API
+
+Creates `revenue-mysql` from `infra/docker/Dockerfile.mysql`, sets `MYSQL_*` on the API, and redeploys.
+
+1. Create an API key: [Account Settings → API Keys](https://dashboard.render.com/u/settings#api-keys)
+2. Ensure billing can cover a **Starter** private service + 10 GB disk (required for MySQL).
+3. Run:
+
+```powershell
+$env:RENDER_API_KEY = "rnd_..."
+node scripts/render-add-mysql.mjs
+```
+
+Or apply the Blueprint (`render.yaml`) from **New → Blueprint** — that also creates `revenue-mysql` and links host/password.
+
 ## Fix current API (`revenue-backend-q2kk`)
 
-On the **web service** → **Environment**:
+On the **API service** → **Environment**:
 
 1. **Delete** any `DATABASE_URL` that contains `${{`
 2. **Set:**

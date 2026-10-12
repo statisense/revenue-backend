@@ -66,6 +66,22 @@ On API: `SEED_ON_BOOT=true` → redeploy → set `false` → redeploy.
 
 Login: `admin@ncs.gov.ng` / `ChangeMe@12345`
 
+## HR / basement SSO (skip login form)
+
+Inbound links:
+
+`https://<web>/?ctx=<hr-jwt>&cid=<company_id>&stid=<staff_id>&from=basement`
+
+Flow: Web → `POST /api/v1/auth/hr-sso` → API calls NCAA HR `get_staff_data` with `token: ctx` → upserts admin user → returns app JWTs → Web stores session (+ HR profile) in `localStorage` → `/dashboard`.
+
+API env (optional; defaults shown):
+
+```text
+HR_STAFF_API_URL=https://hr.ncaa.gov.ng/old_hr/apis/apps/get_staff_data
+HR_SSO_ENABLED=true
+HR_SSO_GRANT_SUPER_ADMIN=true
+```
+
 ## Smoke test
 
 - API health: `https://<api>/api/v1/health`

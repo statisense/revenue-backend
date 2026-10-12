@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -8,7 +8,9 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Landmark, Loader2, ShieldCheck } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
-import { setSession, type AuthUser } from '@/lib/auth';
+import { isAuthenticated, setSession, type AuthUser } from '@/lib/auth';
+import { ensureAutoLogin, isAutoLoginEnabled } from '@/lib/auto-login';
+import { completeHrSso, hasHrSsoQuery, stripHrSsoQueryFromUrl } from '@/lib/hr-sso';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +44,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoBusy, setAutoBusy] = useState(isAutoLoginEnabled());
 
   const {
     register,
@@ -52,6 +55,40 @@ export default function LoginPage() {
     resolver: zodResolver(schema),
     defaultValues: { email: 'admin@ncs.gov.ng', password: DEMO_PASSWORD, totpCode: '' },
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const sso = hasHrSsoQuery();
+      try {
+        if (sso) {
+          setAutoBusy(true);
+          await completeHrSso();
+          if (!cancelled) router.replace('/dashboard');
+          return;
+        }
+        if (isAuthenticated()) {
+          router.replace('/dashboard');
+          return;
+        }
+        if (!isAutoLoginEnabled()) {
+          setAutoBusy(false);
+          return;
+        }
+        await ensureAutoLogin();
+        if (!cancelled) router.replace('/dashboard');
+      } catch (err) {
+        if (!cancelled) {
+          if (sso) stripHrSsoQueryFromUrl();
+          setAutoBusy(false);
+          setError(err instanceof Error ? err.message : 'Sign-in failed');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   async function onSubmit(values: FormValues) {
     setError(null);
@@ -86,6 +123,15 @@ export default function LoginPage() {
     setValue('email', email);
     setValue('password', DEMO_PASSWORD);
     setError(null);
+  }
+
+  if (autoBusy) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-navy px-4 text-sm text-white/75">
+        <div className="h-9 w-9 rounded-full border-2 border-brass/50 border-t-accent animate-spin" />
+        <p>Signing in as super admin…</p>
+      </div>
+    );
   }
 
   return (

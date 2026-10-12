@@ -59,6 +59,20 @@ export const envSchema = z.object({
   DEFAULT_CURRENCY: z.string().default('NGN'),
   PAYMENT_LINK_TTL_HOURS: z.coerce.number().default(72),
   TENANT_AGENCY_CODE: z.string().default('NCS'),
+
+  /** NCAA HR staff lookup used by POST /auth/hr-sso */
+  HR_STAFF_API_URL: z
+    .string()
+    .url()
+    .default('https://hr.ncaa.gov.ng/old_hr/apis/apps/get_staff_data'),
+  HR_SSO_ENABLED: z
+    .string()
+    .default('true')
+    .transform((v) => v !== 'false' && v !== '0'),
+  HR_SSO_GRANT_SUPER_ADMIN: z
+    .string()
+    .default('true')
+    .transform((v) => v !== 'false' && v !== '0'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

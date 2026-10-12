@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { Enable2faDto, ForgotPasswordDto, LoginDto, OAuthTokenDto, RefreshTokenDto, ResetPasswordDto } from './dto/auth.dto';
+import { HrSsoDto } from './dto/hr-sso.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 
@@ -15,6 +16,16 @@ export class AuthController {
   @Post('login')
   login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.auth.login(dto, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  /** NCAA / basement deep-link SSO — server proxies HR staff lookup and issues app JWTs. */
+  @Public()
+  @Post('hr-sso')
+  hrSso(@Body() dto: HrSsoDto, @Req() req: Request) {
+    return this.auth.hrSso(dto, {
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
