@@ -24,13 +24,10 @@ function sha256(value: string) {
  * In-process tenant seed used when shell `pnpm seed` is unavailable (e.g. some Railway runtimes).
  * Creates NCS agency, SUPER_ADMIN role, catalog rows, and demo payments for a rich dashboard.
  */
-export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
-  const ncs = await prisma.agency.findUnique({ where: { code: 'NCS' } });
-  if (ncs) {
-    const paymentCount = await prisma.payment.count({ where: { agencyId: ncs.id } });
-    if (paymentCount > 0) return;
-  }
-
+export async function seedTenantDemoData(prisma: PrismaClient): Promise<{
+  agencyId: string;
+  payments: number;
+}> {
   for (const code of PERMISSIONS) {
     const [module] = code.split(':');
     await prisma.permission.upsert({
@@ -302,4 +299,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<void> {
       },
     });
   }
+
+  const payments = await prisma.payment.count({ where: { agencyId } });
+  return { agencyId, payments };
 }

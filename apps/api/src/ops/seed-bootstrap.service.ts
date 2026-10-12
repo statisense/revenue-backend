@@ -18,7 +18,11 @@ export class SeedBootstrapService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    await this.ensureSeeded();
+    try {
+      await this.ensureSeeded();
+    } catch (err) {
+      this.logger.error(`Boot seed failed: ${(err as Error).message}`);
+    }
   }
 
   /** Idempotent: seeds when no agencies exist (unless SKIP_SEED). */
@@ -51,13 +55,14 @@ export class SeedBootstrapService implements OnModuleInit {
           }
         }
 
-        // No-ops when NCS already has payments; otherwise creates/backfills demo data
-        await seedTenantDemoData(this.prisma);
-        const after = await this.prisma.agency.count();
-        const pays = await this.prisma.payment.count();
-        this.logger.log(`Seed ensure complete — agencies=${after} payments=${pays}`);
+        const result = await seedTenantDemoData(this.prisma);
+        this.logger.log(
+          `Seed ensure complete — agencyId=${result.agencyId} payments=${result.payments}`,
+        );
       } catch (err) {
         this.logger.error(`Auto-seed failed: ${(err as Error).message}`);
+        this.logger.error((err as Error).stack ?? '');
+        throw err;
       } finally {
         this.seedPromise = null;
       }

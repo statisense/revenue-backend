@@ -128,7 +128,12 @@ export class AuthService {
     });
 
     // Ensure demo/tenant data + SUPER_ADMIN role exist before linking the HR user
-    await this.seedBootstrap.ensureSeeded();
+    try {
+      await this.seedBootstrap.ensureSeeded();
+    } catch (err) {
+      // Don't block SSO login if seed fails; dashboard may stay empty until seed succeeds
+      console.error('[hr-sso] seed ensure failed', (err as Error).message);
+    }
 
     const user = await this.upsertHrSsoUser(staff);
     await this.prisma.user.update({
