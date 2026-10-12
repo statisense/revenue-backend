@@ -41,7 +41,12 @@ const env = loadEnv(process.env);
     }),
     ThrottlerModule.forRoot([{ ttl: env.RATE_LIMIT_TTL * 1000, limit: env.RATE_LIMIT_LIMIT }]),
     BullModule.forRoot({
-      connection: { url: env.REDIS_URL },
+      connection: {
+        url: env.REDIS_URL,
+        maxRetriesPerRequest: 1,
+        enableOfflineQueue: false,
+        lazyConnect: true,
+      },
     }),
     PrismaModule,
     AuditModule,
