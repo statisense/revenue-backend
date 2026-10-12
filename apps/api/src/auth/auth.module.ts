@@ -7,12 +7,14 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { ApiKeyStrategy } from './strategies/api-key.strategy';
 import { UsersModule } from '../users/users.module';
+import { OpsModule } from '../ops/ops.module';
 import { CryptoService } from '../common/services/crypto.service';
 import { HrStaffClient } from './hr-staff.client';
 
 @Module({
   imports: [
     UsersModule,
+    OpsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService],

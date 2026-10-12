@@ -167,9 +167,12 @@ if ! pnpm --filter @revenue/database exec prisma migrate deploy; then
   exec node /app/scripts/railway-start.cjs
 fi
 
-# Optional first-boot seed (set SEED_ON_BOOT=true once on Railway, then remove)
-if [ "${SEED_ON_BOOT:-}" = "true" ] || [ "${SEED_ON_BOOT:-}" = "1" ]; then
-  echo "SEED_ON_BOOT enabled — seeding database..."
+# Seed demo/tenant data when DB is empty (seed.ts no-ops if agencies already exist,
+# unless SEED_ON_BOOT / SEED_FORCE is set). Needed so HR SSO admins see a rich dashboard.
+if [ "${SKIP_SEED:-}" = "true" ] || [ "${SKIP_SEED:-}" = "1" ]; then
+  echo "SKIP_SEED set — not seeding"
+else
+  echo "Ensuring database seed (skip if already provisioned)..."
   pnpm --filter @revenue/database seed || echo "Seed failed (non-fatal)"
 fi
 

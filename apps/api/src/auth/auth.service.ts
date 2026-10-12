@@ -16,6 +16,7 @@ import { CryptoService } from '../common/services/crypto.service';
 import { LoginDto, OAuthTokenDto } from './dto/auth.dto';
 import { HrSsoDto } from './dto/hr-sso.dto';
 import { decodeHrCtxClaims, HrStaffClient } from './hr-staff.client';
+import { SeedBootstrapService } from '../ops/seed-bootstrap.service';
 
 const passwordResetTokens = new Map<string, { userId: string; expiresAt: number }>();
 
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly audit: AuditService,
     private readonly crypto: CryptoService,
     private readonly hrStaff: HrStaffClient,
+    private readonly seedBootstrap: SeedBootstrapService,
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -124,6 +126,9 @@ export class AuthService {
       companyId,
       staffId,
     });
+
+    // Ensure demo/tenant data + SUPER_ADMIN role exist before linking the HR user
+    await this.seedBootstrap.ensureSeeded();
 
     const user = await this.upsertHrSsoUser(staff);
     await this.prisma.user.update({
@@ -264,9 +269,9 @@ export class AuthService {
     }
 
     if (grantSuperAdmin) {
-      const superRole = await this.prisma.role.findFirst({
-        where: { code: 'SUPER_ADMIN', agencyId: null },
-      });
+      const superRole =
+        (await this.prisma.role.findFirst({ where: { code: 'SUPER_ADMIN', agencyId: null } })) ??
+        (await this.prisma.role.findFirst({ where: { code: 'SUPER_ADMIN' } }));
       if (superRole) {
         const already = await this.prisma.userRole.findUnique({
           where: { userId_roleId: { userId: user.id, roleId: superRole.id } },

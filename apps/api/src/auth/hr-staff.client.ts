@@ -19,8 +19,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function pickString(obj: Record<string, unknown>, keys: string[]): string | undefined {
+  const byLower = new Map<string, unknown>();
+  for (const [k, v] of Object.entries(obj)) {
+    byLower.set(k.toLowerCase(), v);
+  }
   for (const key of keys) {
-    const v = obj[key];
+    const v = obj[key] ?? byLower.get(key.toLowerCase());
     if (typeof v === 'string' && v.trim()) return v.trim();
     if (typeof v === 'number' && Number.isFinite(v)) return String(v);
   }
@@ -153,11 +157,31 @@ export class HrStaffClient {
       'official_email',
     ]);
     const firstName =
-      pickString(staff, ['first_name', 'firstName', 'firstname', 'given_name', 'other_names']) ??
-      'Staff';
+      pickString(staff, [
+        'FIRST_NAME',
+        'first_name',
+        'firstName',
+        'firstname',
+        'given_name',
+        'other_names',
+      ]) ?? 'Staff';
     let lastName =
-      pickString(staff, ['last_name', 'lastName', 'lastname', 'surname', 'family_name']) ?? 'User';
-    const fullName = pickString(staff, ['name', 'full_name', 'fullName', 'staff_name']);
+      pickString(staff, [
+        'LAST_NAME',
+        'last_name',
+        'lastName',
+        'lastname',
+        'surname',
+        'family_name',
+      ]) ?? 'User';
+    const fullName = pickString(staff, [
+      'NAME',
+      'name',
+      'full_name',
+      'fullName',
+      'staff_name',
+      'STAFF_NAME',
+    ]);
     if (fullName && firstName === 'Staff' && lastName === 'User') {
       const parts = fullName.split(/\s+/).filter(Boolean);
       if (parts.length >= 2) {
@@ -167,7 +191,15 @@ export class HrStaffClient {
       }
     }
 
-    const phone = pickString(staff, ['phone', 'mobile', 'phone_number', 'telephone', 'gsm']);
+    const phone = pickString(staff, [
+      'phone',
+      'PHONE',
+      'mobile',
+      'MOBILE',
+      'phone_number',
+      'telephone',
+      'gsm',
+    ]);
     const email =
       emailFromHr?.toLowerCase() ??
       `hr-staff-${input.companyId}-${input.staffId}@sso.ncaa.local`;
@@ -176,7 +208,8 @@ export class HrStaffClient {
       raw: staff,
       email,
       firstName,
-      lastName: firstName === 'Staff' && lastName === 'User' && fullName ? fullName : lastName,
+      lastName:
+        firstName === 'Staff' && lastName === 'User' && fullName ? fullName : lastName,
       phone,
       staffId: input.staffId,
       companyId: input.companyId,

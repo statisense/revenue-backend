@@ -2421,6 +2421,18 @@ async function printSummary(): Promise<void> {
 }
 
 async function main() {
+  const force =
+    process.env.SEED_FORCE === 'true' ||
+    process.env.SEED_FORCE === '1' ||
+    process.env.SEED_ON_BOOT === 'true' ||
+    process.env.SEED_ON_BOOT === '1';
+
+  const agencyCount = await prisma.agency.count();
+  if (agencyCount > 0 && !force) {
+    console.log(`Seed skipped — ${agencyCount} agency row(s) already present (set SEED_FORCE=true to reseed).`);
+    return;
+  }
+
   console.log('Seeding Government Revenue platform (NCS tenant)...');
 
   await resetNcsForSeed();
