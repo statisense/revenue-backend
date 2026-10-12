@@ -118,15 +118,18 @@ until MYSQL_WAIT_HOST="$MYSQL_WAIT_HOST" MYSQL_WAIT_PORT="$MYSQL_WAIT_PORT" node
   setTimeout(() => process.exit(1), 2000);
 " >/dev/null 2>&1; do
   i=$((i + 1))
-  if [ "$i" -gt 90 ]; then
-    echo "MySQL did not become ready in time"
-    exit 1
+  if [ "$i" -gt 30 ]; then
+    echo "MySQL did not become ready — starting diagnostic server instead of crashing"
+    exec node /app/scripts/railway-start.cjs
   fi
   sleep 2
 done
 
 echo "Applying Prisma migrations..."
-pnpm --filter @revenue/database exec prisma migrate deploy
+if ! pnpm --filter @revenue/database exec prisma migrate deploy; then
+  echo "Migrations failed — starting diagnostic server"
+  exec node /app/scripts/railway-start.cjs
+fi
 
 echo "Starting API on port ${PORT:-4000}..."
 exec node apps/api/dist/main.js

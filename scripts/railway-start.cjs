@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 /**
- * Production start for Railway.
- * - Missing required env → bind PORT and return diagnostic JSON (avoids 502).
- * - Env present → optional migrate, then NestJS.
+ * Railway start: ALWAYS bind PORT first (prevents 502), then boot Nest if env allows.
  */
 const http = require('http');
 const { spawn, spawnSync } = require('child_process');
@@ -42,52 +40,79 @@ function missingEnv() {
   });
 }
 
-function serveDiagnostic(reason, missing) {
-  console.error(`[railway-start] ${reason}`);
-  http
-    .createServer((req, res) => {
-      const payload = {
-        status: 'degraded',
-        service: 'revenue-api',
-        port,
-        error: reason,
-        missing,
-        fix: [
-          'Add Railway MySQL plugin and set DATABASE_URL=${{MySQL.MYSQL_URL}}',
-          'Add Redis plugin and set REDIS_URL=${{Redis.REDIS_URL}}',
-          'Add RabbitMQ and set RABBITMQ_URL=amqp://user:pass@host:5672',
-          'Set JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, HMAC_PAYMENT_SECRET, FIELD_ENCRYPTION_KEY (64 hex)',
-          'Set APP_URL and PAY_URL to your web URL (or this API URL temporarily)',
-          'Prefer Build: Dockerfile path infra/docker/Dockerfile.api + start /app/infra/docker/api-entrypoint.sh',
-        ],
-      };
-      res.writeHead(503, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(payload, null, 2));
-    })
-    .listen(port, '0.0.0.0', () => {
-      console.log(`[railway-start] diagnostic server on 0.0.0.0:${port}`);
-    });
-}
-
 const missing = missingEnv();
 const entry = path.join(__dirname, '..', 'apps', 'api', 'dist', 'main.js');
+let phase = 'starting';
+let detail =
+  missing.length > 0
+    ? `Missing required environment variables: ${missing.join(', ')}`
+    : !fs.existsSync(entry)
+      ? `Nest build missing at ${entry}`
+      : 'Booting API…';
 
-if (missing.length) {
-  serveDiagnostic(`Missing required environment variables: ${missing.join(', ')}`, missing);
-} else if (!fs.existsSync(entry)) {
-  serveDiagnostic(`Nest build missing at ${entry}`, missing);
-} else {
-  console.log('[railway-start] running prisma migrate deploy...');
+const server = http.createServer((_req, res) => {
+  const ok = phase === 'ready';
+  res.writeHead(ok ? 200 : 503, { 'Content-Type': 'application/json' });
+  res.end(
+    JSON.stringify(
+      {
+        status: ok ? 'ok' : 'degraded',
+        service: 'revenue-api',
+        phase,
+        port,
+        error: ok ? undefined : detail,
+        missing,
+        fix: [
+          'Add MySQL → DATABASE_URL=${{MySQL.MYSQL_URL}}',
+          'Add Redis → REDIS_URL=${{Redis.REDIS_URL}}',
+          'Add RabbitMQ → RABBITMQ_URL',
+          'Set JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, HMAC_PAYMENT_SECRET, FIELD_ENCRYPTION_KEY',
+          'Set APP_URL + PAY_URL',
+          'Redeploy after variables are set',
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+});
+
+server.listen(port, '0.0.0.0', () => {
+  console.log(`[railway-start] bound 0.0.0.0:${port} (${detail})`);
+  if (missing.length || !fs.existsSync(entry)) {
+    phase = 'degraded';
+    return;
+  }
+  setImmediate(() => tryBoot());
+});
+
+function tryBoot() {
+  phase = 'migrating';
+  detail = 'Running prisma migrate deploy…';
+  console.log('[railway-start]', detail);
+
   const migrate = spawnSync(
     'pnpm',
     ['--filter', '@revenue/database', 'exec', 'prisma', 'migrate', 'deploy'],
-    { stdio: 'inherit', env: process.env, shell: true },
+    { env: process.env, shell: true, timeout: 20000, encoding: 'utf8' },
   );
-  if (migrate.status !== 0) {
-    serveDiagnostic(`prisma migrate deploy failed with code ${migrate.status}`, missing);
-  } else {
-    console.log(`[railway-start] starting Nest on port ${port}`);
-    const child = spawn(process.execPath, [entry], { stdio: 'inherit', env: process.env });
-    child.on('exit', (code) => process.exit(code ?? 1));
+
+  if (migrate.error || migrate.status !== 0) {
+    phase = 'degraded';
+    detail = `prisma migrate failed: ${migrate.error?.message || migrate.stderr || migrate.status}`;
+    console.error('[railway-start]', detail);
+    return;
   }
+
+  phase = 'launching';
+  detail = 'Starting NestJS…';
+  console.log('[railway-start] closing diagnostic server, starting Nest');
+
+  server.close(() => {
+    const child = spawn(process.execPath, [entry], { stdio: 'inherit', env: process.env });
+    child.on('exit', (code) => {
+      console.error('[railway-start] Nest exited', code);
+      process.exit(code ?? 1);
+    });
+  });
 }
