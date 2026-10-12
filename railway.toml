@@ -1,0 +1,26 @@
+# Default Railway config for this monorepo (picked up when Config-as-code path is unset).
+# Prefer per-service paths in production:
+#   API:  /apps/api/railway.toml
+#   Web:  /apps/web/railway.toml
+#   RabbitMQ: /infra/railway/rabbitmq/railway.toml
+# Keep each service Root Directory at repo root (/).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "infra/docker/Dockerfile.api"
+watchPatterns = [
+  "apps/api/**",
+  "packages/**",
+  "infra/docker/Dockerfile.api",
+  "infra/docker/api-entrypoint.sh",
+  "pnpm-lock.yaml",
+  "package.json",
+  "railway.toml"
+]
+
+[deploy]
+startCommand = "/app/infra/docker/api-entrypoint.sh"
+healthcheckPath = "/api/v1/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
