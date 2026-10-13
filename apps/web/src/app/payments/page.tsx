@@ -16,11 +16,20 @@ type PaymentRequest = {
   paymentReference: string;
   amountMinor: number;
   status: string;
-  payUrl: string;
+  payUrl?: string | null;
   expiresAt: string;
-  invoice?: { id: string; invoiceNumber: string; payerName: string };
+  invoice?: {
+    id: string;
+    invoiceNumber: string;
+    payerName: string;
+    receipts?: { id: string; receiptNumber: string }[];
+  };
   virtualAccount?: { accountNumber: string; bankName: string } | null;
-  payments?: { receipt?: { id: string; receiptNumber: string } | null }[];
+  payments?: {
+    id?: string;
+    status?: string;
+    receipt?: { id: string; receiptNumber: string } | null;
+  }[];
 };
 
 type Invoice = { id: string; invoiceNumber: string; payerName: string; status: string; totalMinor: number };
@@ -30,6 +39,18 @@ function statusVariant(status: string) {
   if (status === 'FAILED' || status === 'EXPIRED') return 'danger' as const;
   if (status === 'PENDING' || status === 'PROCESSING') return 'warning' as const;
   return 'muted' as const;
+}
+
+/** Always use the current web origin — never trust stored seed/legacy hosts. */
+function payPageHref(paymentCode: string) {
+  return `/pay/${encodeURIComponent(paymentCode)}`;
+}
+
+function resolveReceiptNumber(p: PaymentRequest): string | null {
+  const fromPayment = p.payments?.find((pay) => pay.receipt?.receiptNumber)?.receipt?.receiptNumber;
+  if (fromPayment) return fromPayment;
+  const fromInvoice = p.invoice?.receipts?.find((r) => r.receiptNumber)?.receiptNumber;
+  return fromInvoice || null;
 }
 
 export default function PaymentsPage() {
@@ -137,88 +158,99 @@ export default function PaymentsPage() {
             { key: 'expires', label: 'Expires' },
             { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
-          rows={requests.data.map((p) => ({
-            __id: p.id,
-            __search: [
-              p.paymentCode,
-              p.invoice?.invoiceNumber,
-              p.invoice?.payerName,
-              p.status,
-              p.virtualAccount?.bankName,
-              p.virtualAccount?.accountNumber,
-              p.payments?.[0]?.receipt?.receiptNumber,
-            ]
-              .filter(Boolean)
-              .join(' '),
-            code: <span className="cell-code">{p.paymentCode}</span>,
-            invoice: (
-              <div className="cell-stack">
-                <div className="cell-primary">{p.invoice?.invoiceNumber || '—'}</div>
-                <div className="cell-meta">{p.invoice?.payerName || '—'}</div>
-              </div>
-            ),
-            amount: <span className="cell-money">{formatMoney(p.amountMinor)}</span>,
-            va: p.virtualAccount ? (
-              <div className="cell-stack">
-                <div className="cell-primary">{p.virtualAccount.bankName}</div>
-                <div className="cell-meta font-mono tabular-nums">{p.virtualAccount.accountNumber}</div>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            ),
-            status: <Badge variant={statusVariant(p.status)}>{p.status}</Badge>,
-            expires: <span className="whitespace-nowrap text-muted-foreground">{formatDate(p.expiresAt)}</span>,
-            actions: (
-              <div className="flex min-w-[11rem] flex-col items-end gap-1.5">
-                {p.payUrl && (
-                  <a
-                    className="text-xs font-medium text-accent underline-offset-2 hover:underline"
-                    href={p.payUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open pay page
-                  </a>
-                )}
-                {p.status === 'PENDING' && (
-                  <>
-                    <div className="flex w-full max-w-[16rem] flex-col gap-1 sm:flex-row sm:items-center">
-                      <Input
-                        className="h-8 min-w-0 flex-1 text-xs"
-                        placeholder="Email to share"
-                        value={shareEmail}
-                        onChange={(e) => setShareEmail(e.target.value)}
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 shrink-0"
-                        disabled={!shareEmail || share.isPending}
-                        onClick={() => share.mutate({ code: p.paymentCode, recipient: shareEmail })}
-                      >
-                        Share
-                      </Button>
-                    </div>
-                    {process.env.NODE_ENV !== 'production' && (
-                      <Button size="sm" variant="outline" className="h-8" onClick={() => simulate.mutate(p.paymentCode)}>
-                        Simulate
-                      </Button>
-                    )}
-                  </>
-                )}
-                {p.payments?.[0]?.receipt?.receiptNumber && (
-                  <a
-                    className="text-xs font-medium text-accent underline-offset-2 hover:underline"
-                    href={`/receipts/${encodeURIComponent(p.payments[0].receipt.receiptNumber)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Receipt {p.payments[0].receipt.receiptNumber}
-                  </a>
-                )}
-              </div>
-            ),
-          }))}
+          rows={requests.data.map((p) => {
+            const receiptNumber = resolveReceiptNumber(p);
+            const isOpen = p.status === 'PENDING' || p.status === 'PROCESSING';
+            return {
+              __id: p.id,
+              __search: [
+                p.paymentCode,
+                p.invoice?.invoiceNumber,
+                p.invoice?.payerName,
+                p.status,
+                p.virtualAccount?.bankName,
+                p.virtualAccount?.accountNumber,
+                receiptNumber,
+              ]
+                .filter(Boolean)
+                .join(' '),
+              code: <span className="cell-code">{p.paymentCode}</span>,
+              invoice: (
+                <div className="cell-stack">
+                  <div className="cell-primary">{p.invoice?.invoiceNumber || '—'}</div>
+                  <div className="cell-meta">{p.invoice?.payerName || '—'}</div>
+                </div>
+              ),
+              amount: <span className="cell-money">{formatMoney(p.amountMinor)}</span>,
+              va: p.virtualAccount ? (
+                <div className="cell-stack">
+                  <div className="cell-primary">{p.virtualAccount.bankName}</div>
+                  <div className="cell-meta font-mono tabular-nums">{p.virtualAccount.accountNumber}</div>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              ),
+              status: <Badge variant={statusVariant(p.status)}>{p.status}</Badge>,
+              expires: <span className="whitespace-nowrap text-muted-foreground">{formatDate(p.expiresAt)}</span>,
+              actions: (
+                <div className="flex min-w-[11rem] flex-col items-end gap-1.5">
+                  {isOpen ? (
+                    <a
+                      className="text-xs font-medium text-accent underline-offset-2 hover:underline"
+                      href={payPageHref(p.paymentCode)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open pay page
+                    </a>
+                  ) : null}
+                  {p.status === 'PENDING' && (
+                    <>
+                      <div className="flex w-full max-w-[16rem] flex-col gap-1 sm:flex-row sm:items-center">
+                        <Input
+                          className="h-8 min-w-0 flex-1 text-xs"
+                          placeholder="Email to share"
+                          value={shareEmail}
+                          onChange={(e) => setShareEmail(e.target.value)}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 shrink-0"
+                          disabled={!shareEmail || share.isPending}
+                          onClick={() => share.mutate({ code: p.paymentCode, recipient: shareEmail })}
+                        >
+                          Share
+                        </Button>
+                      </div>
+                      {process.env.NODE_ENV !== 'production' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          onClick={() => simulate.mutate(p.paymentCode)}
+                        >
+                          Simulate
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {receiptNumber ? (
+                    <a
+                      className="text-xs font-medium text-accent underline-offset-2 hover:underline"
+                      href={`/receipts/${encodeURIComponent(receiptNumber)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View receipt
+                    </a>
+                  ) : p.status === 'PAID' ? (
+                    <span className="text-[11px] text-muted-foreground">Receipt pending</span>
+                  ) : null}
+                </div>
+              ),
+            };
+          })}
         />
       )}
     </div>

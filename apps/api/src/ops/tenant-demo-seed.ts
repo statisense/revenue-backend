@@ -224,7 +224,11 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<{
     const prId = `ncs-demo-pr-${row.label}`;
     const payId = `ncs-demo-pay-${row.label}`;
     const code = `NCSDEMO${i.toString().padStart(4, '0')}`;
-    const payUrl = `https://pay.example.local/pay/${code}`;
+    const payBase = (process.env.PAY_URL || process.env.APP_URL || 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    const payUrl = `${payBase}/pay/${code}`;
 
     await prisma.invoice.upsert({
       where: { id: invoiceId },
@@ -269,7 +273,7 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<{
 
     await prisma.paymentRequest.upsert({
       where: { id: prId },
-      update: {},
+      update: { payUrl, qrPayload: payUrl },
       create: {
         id: prId,
         agencyId,
@@ -309,6 +313,28 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<{
         },
       });
       if (!firstPaidPaymentId) firstPaidPaymentId = payId;
+
+      const receiptId = `ncs-demo-rcp-${row.label}`;
+      const receiptNumber = `NCS-DEMO-RCP-${i.toString().padStart(4, '0')}`;
+      await prisma.receipt.upsert({
+        where: { paymentId: payId },
+        update: {},
+        create: {
+          id: receiptId,
+          agencyId,
+          paymentId: payId,
+          invoiceId,
+          receiptNumber,
+          amountMinor: row.amount,
+          currency: 'NGN',
+          paymentReference: `NCS-PR-DEMO-${i}`,
+          invoiceNumber: `NCS-DEMO-${i.toString().padStart(4, '0')}`,
+          agencyName: 'Nigeria Government Revenue System',
+          qrVerification: `demo-qr://${receiptNumber}`,
+          digitalSignature: sha256(`demo-sig-${row.label}`),
+          issuedAt: row.paidAt,
+        },
+      });
     }
   }
 

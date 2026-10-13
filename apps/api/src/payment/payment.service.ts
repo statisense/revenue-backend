@@ -117,7 +117,7 @@ export class PaymentService {
       expiresAt: expiresAt.toISOString(),
       secret: hmacSecret,
     });
-    const payUrl = `${this.config.getOrThrow<string>('PAY_URL')}/pay/${paymentCode}`;
+    const payUrl = this.canonicalPayUrl(paymentCode);
     const qrPayload = await QRCode.toDataURL(payUrl);
 
     const revenueName = invoice.lines[0]?.revenueType?.name ?? invoice.lines[0]?.description ?? 'Revenue Payment';
@@ -259,14 +259,15 @@ export class PaymentService {
 
     const tokenCheck = verifyPaymentToken(pr.hmacToken, this.config.getOrThrow('HMAC_PAYMENT_SECRET'));
     const meta = (pr.metadata ?? {}) as { revenueName?: string };
-    const qrCode = await this.resolveQrDataUrl(pr.qrPayload, pr.payUrl);
+    const payUrl = this.canonicalPayUrl(pr.paymentCode);
+    const qrCode = await this.resolveQrDataUrl(pr.qrPayload, payUrl);
 
-    // Persist a proper QR image when seed/legacy rows only stored a plain URL
-    if (qrCode && qrCode !== pr.qrPayload && qrCode.startsWith('data:image')) {
-      await this.prisma.paymentRequest.update({
-        where: { id: pr.id },
-        data: { qrPayload: qrCode },
-      });
+    // Heal legacy/demo pay URLs and QR payloads stored with the wrong host
+    const patch: { payUrl?: string; qrPayload?: string } = {};
+    if (pr.payUrl !== payUrl) patch.payUrl = payUrl;
+    if (qrCode && qrCode !== pr.qrPayload && qrCode.startsWith('data:image')) patch.qrPayload = qrCode;
+    if (Object.keys(patch).length) {
+      await this.prisma.paymentRequest.update({ where: { id: pr.id }, data: patch });
     }
 
     const paystackPublicKey = this.config.get<string>('PAYSTACK_PUBLIC_KEY') || '';
@@ -301,13 +302,25 @@ export class PaymentService {
           }
         : null,
       qrCode,
-      payUrl: pr.payUrl,
+      payUrl,
       expiresAt: pr.expiresAt,
       status: pr.status,
       methods: (pr.preferredMethods as PaymentMethod[] | null) ?? [],
       tokenValid: tokenCheck.valid,
       hmacToken: pr.hmacToken,
     };
+  }
+
+  private payBaseUrl() {
+    return (this.config.get<string>('PAY_URL') || this.config.get<string>('APP_URL') || '')
+      .trim()
+      .replace(/\/$/, '');
+  }
+
+  private canonicalPayUrl(paymentCode: string) {
+    const base = this.payBaseUrl();
+    if (!base) throw new BadRequestException('PAY_URL is not configured');
+    return `${base}/pay/${paymentCode}`;
   }
 
   private async resolveQrDataUrl(qrPayload: string | null | undefined, payUrl: string | null | undefined) {
@@ -349,11 +362,16 @@ export class PaymentService {
     if (!pr) throw new NotFoundException('Payment not found');
     this.abac.assertAgencyAccess(actor, pr.agencyId);
 
+    const payUrl = this.canonicalPayUrl(pr.paymentCode);
+    if (pr.payUrl !== payUrl) {
+      await this.prisma.paymentRequest.update({ where: { id: pr.id }, data: { payUrl } });
+    }
+
     await this.notifyQueue.add('send', {
       channel: dto.channel,
       recipient: dto.recipient,
       subject: `Payment request ${pr.paymentCode}`,
-      body: `Please pay via ${pr.payUrl}. Amount: ${(pr.amountMinor / 100).toFixed(2)} ${pr.currency}. Expires ${pr.expiresAt.toISOString()}`,
+      body: `Please pay via ${payUrl}. Amount: ${(pr.amountMinor / 100).toFixed(2)} ${pr.currency}. Expires ${pr.expiresAt.toISOString()}`,
       agencyId: pr.agencyId,
       metadata: { paymentCode: pr.paymentCode },
     });
@@ -366,7 +384,7 @@ export class PaymentService {
         metadata: { recipient: dto.recipient },
       },
     });
-    return { queued: true, payUrl: pr.payUrl };
+    return { queued: true, payUrl };
   }
 
   async verify(dto: VerifyPaymentDto) {
@@ -633,17 +651,63 @@ export class PaymentService {
 
   async listRequests(actor: AuthUser, agencyId?: string) {
     const resolved = this.abac.resolveAgencyId(actor, agencyId);
-    return this.prisma.paymentRequest.findMany({
+    const rows = await this.prisma.paymentRequest.findMany({
       where: { agencyId: resolved },
       include: {
-        invoice: true,
+        invoice: {
+          include: {
+            receipts: { take: 1, orderBy: { issuedAt: 'desc' } },
+          },
+        },
         virtualAccount: true,
         paymentLink: true,
-        payments: { include: { receipt: true }, take: 1, orderBy: { createdAt: 'desc' } },
+        payments: {
+          include: { receipt: true },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
+
+    const base = this.payBaseUrl();
+    const staleIds: string[] = [];
+
+    for (const row of rows) {
+      const payUrl = base ? `${base}/pay/${row.paymentCode}` : row.payUrl;
+      if (base && row.payUrl !== payUrl) {
+        row.payUrl = payUrl;
+        staleIds.push(row.id);
+      }
+
+      // Issue missing receipts for paid collections so the console can link them
+      for (const payment of row.payments) {
+        if (payment.status === PaymentStatus.PAID && !payment.receipt) {
+          try {
+            payment.receipt = await this.receipts.issueForPayment(payment.id);
+          } catch (err) {
+            this.logger.warn(
+              `Could not issue receipt for payment ${payment.id}: ${(err as Error).message}`,
+            );
+          }
+        }
+      }
+    }
+
+    if (staleIds.length && base) {
+      await Promise.all(
+        staleIds.map((id) => {
+          const row = rows.find((r) => r.id === id)!;
+          return this.prisma.paymentRequest.update({
+            where: { id },
+            data: { payUrl: row.payUrl },
+          });
+        }),
+      );
+    }
+
+    return rows;
   }
 
   async getReceipt(id: string) {
