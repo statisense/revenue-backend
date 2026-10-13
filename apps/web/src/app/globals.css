@@ -208,9 +208,14 @@
     max-width: none !important;
   }
 
-  .report-print-root {
+  .report-print-root,
+  .fiscal-print-root {
     border: 0 !important;
     border-radius: 0 !important;
+  }
+
+  .fiscal-print-root {
+    max-width: none !important;
   }
 
   .report-print-root header {

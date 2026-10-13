@@ -110,8 +110,28 @@ export class ReceiptService {
       where: { OR: [{ id }, { receiptNumber: id }] },
       include: {
         payment: { include: { paymentRequest: true } },
-        invoice: true,
-        agency: true,
+        invoice: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            payerName: true,
+            payerEmail: true,
+            payerPhone: true,
+            payerTin: true,
+            status: true,
+            totalMinor: true,
+          },
+        },
+        agency: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            shortName: true,
+            email: true,
+            phone: true,
+          },
+        },
       },
     });
     if (!receipt) throw new NotFoundException('Receipt not found');

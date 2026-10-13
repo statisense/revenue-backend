@@ -64,8 +64,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['var(--font-dm-sans)', 'system-ui', 'sans-serif'],
-        serif: ['var(--font-source-serif)', 'Georgia', 'serif'],
+        sans: ['var(--font-manrope)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-fraunces)', 'ui-serif', 'Georgia', 'serif'],
       },
       borderRadius: {
         lg: 'var(--radius)',

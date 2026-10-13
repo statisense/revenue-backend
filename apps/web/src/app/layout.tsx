@@ -1,17 +1,17 @@
 import type { Metadata, Viewport } from 'next';
-import { DM_Sans, Source_Serif_4 } from 'next/font/google';
+import { Fraunces, Manrope } from 'next/font/google';
 import { Providers } from '@/components/providers';
 import './globals.css';
 
-const dmSans = DM_Sans({
+const manrope = Manrope({
   subsets: ['latin'],
-  variable: '--font-dm-sans',
+  variable: '--font-manrope',
   display: 'swap',
 });
 
-const sourceSerif = Source_Serif_4({
+const fraunces = Fraunces({
   subsets: ['latin'],
-  variable: '--font-source-serif',
+  variable: '--font-fraunces',
   display: 'swap',
 });
 
@@ -29,7 +29,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${dmSans.variable} ${sourceSerif.variable} font-sans`}>
+      <body className={`${manrope.variable} ${fraunces.variable} font-sans`}>
         <Providers>{children}</Providers>
       </body>
     </html>

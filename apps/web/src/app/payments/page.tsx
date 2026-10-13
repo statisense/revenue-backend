@@ -197,9 +197,14 @@ export default function PaymentsPage() {
                   </>
                 )}
                 {p.payments?.[0]?.receipt?.receiptNumber && (
-                  <span className="text-xs text-muted-foreground">
-                    Receipt {p.payments[0].receipt.receiptNumber}
-                  </span>
+                  <a
+                    className="text-xs font-medium text-accent underline"
+                    href={`/receipts/${encodeURIComponent(p.payments[0].receipt.receiptNumber)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View receipt {p.payments[0].receipt.receiptNumber}
+                  </a>
                 )}
               </div>
             ),

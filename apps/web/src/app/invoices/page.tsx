@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, Pencil, Ban, X } from 'lucide-react';
+import { Eye, Pencil, Ban } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { formatDate, formatMoney } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
+import { InvoiceDocument, type InvoiceDocumentData } from '@/components/invoice-document';
+import { displayAgencyName } from '@/lib/brand';
 
 type RevenueType = { id: string; code: string; name: string; defaultAmountMinor?: number | null };
 type TaxType = { id: string; code: string; name: string; ratePercent: number | string };
@@ -31,30 +33,8 @@ type InvoiceLine = {
   taxType?: { code: string; name: string; ratePercent?: number | string } | null;
 };
 
-type InvoiceDetail = {
-  id: string;
-  invoiceNumber: string;
-  payerName: string;
-  payerEmail?: string | null;
-  payerPhone?: string | null;
-  payerTin?: string | null;
-  status: string;
-  subtotalMinor: number;
-  taxMinor: number;
-  totalMinor: number;
-  amountPaidMinor?: number;
-  dueAt?: string | null;
-  issuedAt?: string | null;
-  createdAt: string;
-  notes?: string | null;
+type InvoiceDetail = InvoiceDocumentData & {
   lines: InvoiceLine[];
-  paymentRequests?: {
-    id: string;
-    paymentCode: string;
-    status: string;
-    payUrl?: string;
-    amountMinor: number;
-  }[];
 };
 
 type Invoice = {
@@ -123,6 +103,14 @@ export default function InvoicesPage() {
   const taxes = useQuery({
     queryKey: ['tax-types'],
     queryFn: () => api<TaxType[]>('/revenue/taxes'),
+  });
+  const tenant = useQuery({
+    queryKey: ['tenant'],
+    queryFn: () =>
+      api<{
+        agency?: { code?: string; name?: string; email?: string | null; phone?: string | null } | null;
+      }>('/tenant'),
+    retry: false,
   });
   const detail = useQuery({
     queryKey: ['invoice', viewId ?? editingId],
@@ -305,7 +293,28 @@ export default function InvoicesPage() {
   }
 
   const showForm = mode === 'create' || mode === 'edit';
-  const viewing = mode === 'view' ? detail.data : null;
+  const viewing = useMemo(() => {
+    if (mode !== 'view' || !detail.data) return null;
+    const inv = detail.data;
+    if (inv.agency?.name) {
+      return {
+        ...inv,
+        agency: { ...inv.agency, name: displayAgencyName(inv.agency.name) },
+      };
+    }
+    if (tenant.data?.agency) {
+      return {
+        ...inv,
+        agency: {
+          code: tenant.data.agency.code,
+          name: displayAgencyName(tenant.data.agency.name),
+          email: tenant.data.agency.email,
+          phone: tenant.data.agency.phone,
+        },
+      };
+    }
+    return inv;
+  }, [mode, detail.data, tenant.data]);
 
   return (
     <div className="space-y-6">
@@ -448,147 +457,24 @@ export default function InvoicesPage() {
       )}
 
       {mode === 'view' && (
-        <Card className="mb-6">
-          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-            <div>
-              <CardTitle>Invoice details</CardTitle>
-              {viewing && (
-                <p className="mt-1 text-sm text-muted-foreground">{viewing.invoiceNumber}</p>
-              )}
-            </div>
-            <Button size="sm" variant="ghost" onClick={closePanels}>
-              <X className="h-4 w-4" />
-              Close
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {detail.isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-            {detail.error && (
-              <ErrorState
-                message={detail.error instanceof Error ? detail.error.message : 'Failed to load'}
-                onRetry={() => detail.refetch()}
-              />
-            )}
-            {viewing && (
-              <div className="space-y-6">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={statusVariant(viewing.status)}>{viewing.status}</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    Issued {formatDate(viewing.issuedAt ?? viewing.createdAt)} · Due{' '}
-                    {formatDate(viewing.dueAt)}
-                  </span>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Payer</p>
-                    <p className="font-medium">{viewing.payerName}</p>
-                    {viewing.payerEmail && (
-                      <p className="text-sm text-muted-foreground">{viewing.payerEmail}</p>
-                    )}
-                    {viewing.payerPhone && (
-                      <p className="text-sm text-muted-foreground">{viewing.payerPhone}</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Totals</p>
-                    <p className="font-serif text-xl">{formatMoney(viewing.totalMinor)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Base {formatMoney(viewing.subtotalMinor)} + tax {formatMoney(viewing.taxMinor)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Paid</p>
-                    <p className="font-medium">{formatMoney(viewing.amountPaidMinor ?? 0)}</p>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-border">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="border-b border-border bg-muted/50">
-                      <tr>
-                        <th className="px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                          Description
-                        </th>
-                        <th className="px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                          Revenue
-                        </th>
-                        <th className="px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                          Tax
-                        </th>
-                        <th className="px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                          Qty
-                        </th>
-                        <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wider text-muted-foreground">
-                          Line total
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {viewing.lines.map((line, idx) => (
-                        <tr key={line.id ?? idx} className="border-b border-border/80 last:border-0">
-                          <td className="px-3 py-2">{line.description}</td>
-                          <td className="px-3 py-2">
-                            {line.revenueType
-                              ? `${line.revenueType.code} — ${line.revenueType.name}`
-                              : '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {line.taxType
-                              ? `${line.taxType.code} (${Number(line.taxRatePercent ?? line.taxType.ratePercent ?? 0)}%)`
-                              : '—'}
-                          </td>
-                          <td className="px-3 py-2">{Number(line.quantity)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {formatMoney(line.lineTotalMinor)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {viewing.paymentRequests && viewing.paymentRequests.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                      Payment requests
-                    </p>
-                    <div className="space-y-2">
-                      {viewing.paymentRequests.map((pr) => (
-                        <div
-                          key={pr.id}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"
-                        >
-                          <span className="font-mono text-xs">{pr.paymentCode}</span>
-                          <Badge variant="outline">{pr.status}</Badge>
-                          <span className="tabular-nums">{formatMoney(pr.amountMinor)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {canMutateInvoice(viewing) && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => openEdit(viewing.id)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={cancelInvoice.isPending}
-                      onClick={() => onCancelClick(viewing)}
-                    >
-                      <Ban className="h-3.5 w-3.5" />
-                      Cancel invoice
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="mb-6">
+          {detail.isLoading && <LoadingState label="Loading invoice document…" />}
+          {detail.error && (
+            <ErrorState
+              message={detail.error instanceof Error ? detail.error.message : 'Failed to load'}
+              onRetry={() => detail.refetch()}
+            />
+          )}
+          {viewing && (
+            <InvoiceDocument
+              invoice={viewing}
+              onClose={closePanels}
+              canMutate={canMutateInvoice(viewing)}
+              onEdit={() => openEdit(viewing.id)}
+              onCancel={() => onCancelClick(viewing)}
+            />
+          )}
+        </div>
       )}
 
       {list.isLoading && <LoadingState label="Loading invoices…" />}
