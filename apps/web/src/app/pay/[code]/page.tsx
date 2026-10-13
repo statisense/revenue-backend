@@ -215,7 +215,7 @@ export default function PayByCodePage() {
           <h1 className="font-serif text-2xl">Payment unavailable</h1>
           <p className="mt-2 text-sm">{error || 'Unknown error'}</p>
           <p className="mt-2 text-xs text-red-700/80">
-            Try a seeded code such as NCS202607000001 after running <code>pnpm db:seed</code>.
+            Try a seeded demo code such as NCS202607000001 after running <code>pnpm db:seed</code>.
           </p>
           <button className="mt-4 text-sm underline" onClick={() => router.push('/pay')}>
             Enter another code

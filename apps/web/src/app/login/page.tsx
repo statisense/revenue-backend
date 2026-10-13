@@ -34,7 +34,7 @@ type LoginResponse =
 
 const DEMO_ACCOUNTS = [
   { email: 'admin@ncs.gov.ng', role: 'Super Admin', note: 'Full platform access' },
-  { email: 'officer.apapa@ncs.gov.ng', role: 'Assessment Officer', note: 'Apapa branch' },
+  { email: 'officer.apapa@ncs.gov.ng', role: 'Assessment Officer', note: 'HQ / field office' },
   { email: 'approver@ncs.gov.ng', role: 'Approver', note: 'Assessment approvals' },
 ] as const;
 
@@ -158,14 +158,14 @@ export default function LoginPage() {
             <Landmark className="h-7 w-7" />
           </div>
           <p className="text-[11px] uppercase tracking-[0.22em] text-brass-soft">
-            Federal Revenue Collection
+            Federal Republic of Nigeria
           </p>
           <h1 className="mt-3 font-serif text-4xl leading-tight tracking-tight">
-            Government Revenue
+            Nigeria Government Revenue System
           </h1>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-white/70">
-            Secure assessment, billing, payment, and treasury settlement for agency revenue
-            operations — built for institutional trust and auditability.
+            Secure assessment, billing, payment, and treasury settlement for MDAs — built for
+            institutional trust, dual control, and auditability.
           </p>
           <div className="mt-8 flex items-center gap-2 text-xs text-white/50">
             <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-accent-300" />
@@ -179,13 +179,13 @@ export default function LoginPage() {
               <Landmark className="h-5 w-5" />
             </div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-brass-deep lg:hidden">
-              Federal Revenue Collection
+              Nigeria Government Revenue System
             </p>
             <CardTitle className="text-xl text-navy dark:text-foreground sm:text-2xl">
               Officer sign-in
             </CardTitle>
             <CardDescription>
-              Access the NCS revenue collection workspace with your official credentials.
+              Access the national revenue collection workspace with your official credentials.
             </CardDescription>
           </CardHeader>
           <CardContent>

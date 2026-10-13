@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Landmark, ArrowRight, ShieldCheck } from 'lucide-react';
 
 const SAMPLE_CODES = [
-  { code: 'NCS202607000001', label: 'Pending · Harbour / cargo dues' },
-  { code: 'NCS202607000002', label: 'Paid · MSC container settlement' },
-  { code: 'NCS202607000003', label: 'Expired · Berthage demo' },
+  { code: 'NCS202607000001', label: 'Pending · Licence / permit fee' },
+  { code: 'NCS202607000002', label: 'Paid · Service charge settlement' },
+  { code: 'NCS202607000003', label: 'Expired · Administrative fee demo' },
   { code: 'NCS202607000004', label: 'Pending · Remita VA demo' },
-  { code: 'NCS202607000005', label: 'Paid · Alternate MSC receipt' },
+  { code: 'NCS202607000005', label: 'Paid · Alternate receipt demo' },
 ] as const;
 
 export default function PayLandingPage() {
@@ -39,7 +39,9 @@ export default function PayLandingPage() {
             <Landmark className="h-7 w-7" />
           </div>
           <p className="text-[11px] uppercase tracking-[0.22em] text-brass-deep">Public payment portal</p>
-          <h1 className="mt-3 font-serif text-4xl leading-tight text-navy">Government Revenue Pay</h1>
+          <h1 className="mt-3 font-serif text-4xl leading-tight text-navy">
+            Nigeria Government Revenue Pay
+          </h1>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-[color:var(--pay-muted)]">
             Settle agency invoices with bank transfer to a dedicated virtual account, QR, or your
             preferred gateway — receipts are issued instantly on confirmation.
@@ -55,7 +57,7 @@ export default function PayLandingPage() {
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-accent seal-ring lg:hidden">
               <Landmark className="h-5 w-5" />
             </div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-brass-soft">NCS collections</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-brass-soft">NGRS collections</p>
             <h2 className="mt-2 font-serif text-2xl sm:text-3xl">Pay with code</h2>
             <p className="mt-2 text-sm text-white/75">
               Enter the payment code from your invoice SMS, email, or assessment notice.

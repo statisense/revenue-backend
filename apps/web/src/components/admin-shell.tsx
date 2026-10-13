@@ -339,10 +339,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </div>
       <div className="min-w-0">
         <p className="truncate font-serif text-[1.05rem] leading-none tracking-tight sm:text-[1.15rem]">
-          Government Revenue
+          NGRS
         </p>
-        <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-brass-soft/90">
-          Collection Console
+        <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-brass-soft/90">
+          Nigeria Gov. Revenue
         </p>
       </div>
     </div>
@@ -422,10 +422,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </Button>
             <div className="min-w-0">
               <p className="truncate text-sm text-muted-foreground">
-                <span className="font-medium text-navy dark:text-foreground">NCS</span>
+                <span className="font-medium text-navy dark:text-foreground">NGRS</span>
                 <span className="mx-1.5 text-brass/50 sm:mx-2">·</span>
-                <span className="hidden min-[380px]:inline">Enterprise revenue operations</span>
-                <span className="min-[380px]:hidden">Revenue ops</span>
+                <span className="hidden min-[380px]:inline">Nigeria Government Revenue System</span>
+                <span className="min-[380px]:hidden">Revenue system</span>
               </p>
             </div>
           </div>

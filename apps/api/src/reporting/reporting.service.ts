@@ -88,9 +88,9 @@ export class ReportingService {
       resolved,
       agency: agency ?? {
         id: resolved,
-        code: 'NCS',
-        name: 'Nigeria Customs',
-        shortName: 'NCS',
+        code: 'NGRS',
+        name: 'Nigeria Government Revenue System',
+        shortName: 'NGRS',
         defaultCurrency: 'NGN',
       },
     };
@@ -112,9 +112,14 @@ export class ReportingService {
       audience: pack.audience,
       standards: pack.standards,
       agency: {
-        code: agency.code,
-        name: agency.name,
-        shortName: agency.shortName,
+        code: agency.code === 'NCS' ? 'NGRS' : agency.code,
+        name: /customs/i.test(agency.name)
+          ? 'Nigeria Government Revenue System'
+          : agency.name,
+        shortName:
+          agency.shortName === 'NCS' || !agency.shortName
+            ? 'NGRS'
+            : agency.shortName,
       },
       period,
       start,
@@ -508,7 +513,12 @@ export class ReportingService {
       meta: {
         ...this.packMeta(
           REPORT_CATALOG.find((r) => r.id === 'collection')!,
-          agency ?? { code: 'NCS', name: 'Nigeria Customs', shortName: 'NCS', defaultCurrency: 'NGN' },
+          agency ?? {
+            code: 'NGRS',
+            name: 'Nigeria Government Revenue System',
+            shortName: 'NGRS',
+            defaultCurrency: 'NGN',
+          },
           period,
           start,
           end,

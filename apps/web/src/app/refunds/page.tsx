@@ -27,12 +27,20 @@ type Payment = {
   invoice?: { invoiceNumber?: string };
 };
 
+function statusVariant(status: string) {
+  if (status === 'PAID') return 'success' as const;
+  if (status === 'PENDING') return 'warning' as const;
+  if (status === 'FAILED') return 'danger' as const;
+  return 'muted' as const;
+}
+
 export default function RefundsPage() {
   const [showForm, setShowForm] = useState(false);
   const [paymentId, setPaymentId] = useState('');
   const [amountMajor, setAmountMajor] = useState('');
   const [reason, setReason] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const list = useQuery({
@@ -60,34 +68,60 @@ export default function RefundsPage() {
       setPaymentId('');
       setAmountMajor('');
       setReason('');
+      setFormError(null);
       await queryClient.invalidateQueries({ queryKey: ['refunds'] });
     },
     onError: (err) => setFormError(err instanceof ApiError ? err.message : 'Failed'),
+  });
+
+  const decide = useMutation({
+    mutationFn: ({ id, path }: { id: string; path: 'approve' | 'reject' }) =>
+      api(`/refunds/${id}/${path}`, {
+        method: 'POST',
+        body: path === 'reject' ? { reason: 'Rejected via dual-control console' } : {},
+      }),
+    onSuccess: async () => {
+      setActionError(null);
+      await queryClient.invalidateQueries({ queryKey: ['refunds'] });
+      await queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+    onError: (err) => setActionError(err instanceof ApiError ? err.message : 'Decision failed'),
   });
 
   const maintenance = useMutation({
     mutationFn: () => api('/jobs/maintenance', { method: 'POST', body: {} }),
   });
 
+  const pendingCount = list.data?.filter((r) => r.status === 'PENDING').length ?? 0;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Refunds"
-        description="Issue refunds against collected payments"
+        description="Dual-control refunds — request, then approve or reject before funds are marked refunded"
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => maintenance.mutate()} disabled={maintenance.isPending}>
               Run maintenance jobs
             </Button>
-            <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'New refund'}</Button>
+            <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Close' : 'Request refund'}</Button>
           </div>
         }
       />
 
+      {pendingCount > 0 ? (
+        <div className="rounded-lg border border-brass/30 bg-brass/5 px-4 py-3 text-sm">
+          <span className="font-medium text-navy dark:text-foreground">{pendingCount} refund(s)</span>
+          <span className="text-muted-foreground"> awaiting dual-control approval.</span>
+        </div>
+      ) : null}
+
+      {actionError && <p className="text-sm text-red-700">{actionError}</p>}
+
       {showForm && (
-        <Card className="mb-6">
+        <Card>
           <CardHeader>
-            <CardTitle>Create refund</CardTitle>
+            <CardTitle>Request refund</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
@@ -107,7 +141,8 @@ export default function RefundsPage() {
                   .filter((p) => p.status === 'PAID' || p.status === 'PARTIALLY_REFUNDED')
                   .map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.invoice?.invoiceNumber || p.providerRef || p.id.slice(0, 8)} — {formatMoney(p.amountMinor)}
+                      {p.invoice?.invoiceNumber || p.providerRef || p.id.slice(0, 8)} —{' '}
+                      {formatMoney(p.amountMinor)}
                     </option>
                   ))}
               </select>
@@ -121,8 +156,12 @@ export default function RefundsPage() {
               <Input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} />
             </div>
             {formError && <p className="sm:col-span-2 text-sm text-red-700">{formError}</p>}
+            <p className="sm:col-span-2 text-xs text-muted-foreground">
+              Submitting creates a PENDING refund. A second officer must approve before the payment is marked
+              refunded.
+            </p>
             <Button disabled={!paymentId || create.isPending} onClick={() => create.mutate()}>
-              {create.isPending ? 'Submitting…' : 'Submit refund'}
+              {create.isPending ? 'Submitting…' : 'Submit for approval'}
             </Button>
           </CardContent>
         </Card>
@@ -130,7 +169,10 @@ export default function RefundsPage() {
 
       {list.isLoading && <LoadingState label="Loading refunds…" />}
       {list.error && (
-        <ErrorState message={list.error instanceof Error ? list.error.message : 'Failed'} onRetry={() => list.refetch()} />
+        <ErrorState
+          message={list.error instanceof Error ? list.error.message : 'Failed'}
+          onRetry={() => list.refetch()}
+        />
       )}
       {list.data && (
         <DataTable
@@ -142,6 +184,7 @@ export default function RefundsPage() {
             { key: 'status', label: 'Status' },
             { key: 'reason', label: 'Reason' },
             { key: 'created', label: 'Created' },
+            { key: 'actions', label: 'Actions' },
           ]}
           rows={list.data.map((r) => ({
             __id: r.id,
@@ -149,9 +192,31 @@ export default function RefundsPage() {
             id: r.id.slice(0, 10),
             payment: r.payment?.providerRef ?? r.payment?.id?.slice(0, 10) ?? '—',
             amount: formatMoney(r.amountMinor),
-            status: <Badge>{r.status}</Badge>,
+            status: <Badge variant={statusVariant(r.status)}>{r.status}</Badge>,
             reason: r.reason ?? '—',
             created: formatDate(r.createdAt),
+            actions:
+              r.status === 'PENDING' ? (
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    size="sm"
+                    disabled={decide.isPending}
+                    onClick={() => decide.mutate({ id: r.id, path: 'approve' })}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={decide.isPending}
+                    onClick={() => decide.mutate({ id: r.id, path: 'reject' })}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              ) : (
+                '—'
+              ),
           }))}
         />
       )}

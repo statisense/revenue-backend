@@ -28,6 +28,7 @@ type Assessment = {
 
 const schema = z.object({
   payerName: z.string().min(2),
+  payerTin: z.string().optional(),
   payerEmail: z.string().email().optional().or(z.literal('')),
   payerPhone: z.string().optional(),
   revenueTypeId: z.string().min(1),
@@ -72,6 +73,7 @@ export default function AssessmentsPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       payerName: '',
+      payerTin: '',
       payerEmail: '',
       payerPhone: '',
       revenueTypeId: '',
@@ -99,6 +101,7 @@ export default function AssessmentsPage() {
         method: 'POST',
         body: {
           payerName: values.payerName,
+          payerTin: values.payerTin || undefined,
           payerEmail: values.payerEmail || undefined,
           payerPhone: values.payerPhone || undefined,
           lines: [
@@ -176,6 +179,14 @@ export default function AssessmentsPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="payerName">Payer name</Label>
                 <Input id="payerName" {...form.register('payerName')} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="payerTin">TIN / Tax ID</Label>
+                <Input
+                  id="payerTin"
+                  placeholder="Optional taxpayer identification number"
+                  {...form.register('payerTin')}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="payerEmail">Payer email</Label>

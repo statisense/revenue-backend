@@ -1,10 +1,18 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 import { OpsService } from './ops.service';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/permissions.decorator';
 import { CreateRefundDto, UpsertGatewayConfigDto } from '../common/dto/ops.dto';
 import { Public } from '../common/decorators/public.decorator';
+
+class RejectRefundDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
 
 @ApiTags('ops')
 @ApiBearerAuth()
@@ -44,6 +52,22 @@ export class OpsController {
   @RequirePermissions('payments:refund')
   createRefund(@CurrentUser() user: AuthUser, @Body() dto: CreateRefundDto) {
     return this.ops.createRefund(user, dto);
+  }
+
+  @Post('refunds/:id/approve')
+  @RequirePermissions('payments:refund')
+  approveRefund(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.ops.approveRefund(user, id);
+  }
+
+  @Post('refunds/:id/reject')
+  @RequirePermissions('payments:refund')
+  rejectRefund(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: RejectRefundDto,
+  ) {
+    return this.ops.rejectRefund(user, id, dto.reason);
   }
 
   @Get('refunds')

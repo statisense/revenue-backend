@@ -51,17 +51,18 @@ export async function seedTenantDemoData(prisma: PrismaClient): Promise<{
   await prisma.agency.upsert({
     where: { code: 'NCS' },
     update: {
-      name: 'Nigeria Customs',
-      shortName: 'NCS',
+      name: 'Nigeria Government Revenue System',
+      shortName: 'NGRS',
       status: 'ACTIVE',
+      email: 'revenue@ngrs.gov.ng',
     },
     create: {
       id: AGENCY_ID,
       code: 'NCS',
-      name: 'Nigeria Customs',
-      shortName: 'NCS',
+      name: 'Nigeria Government Revenue System',
+      shortName: 'NGRS',
       status: 'ACTIVE',
-      email: 'revenue@customs.gov.ng',
+      email: 'revenue@ngrs.gov.ng',
       phone: '+23412700000',
       country: 'NG',
       defaultCurrency: 'NGN',

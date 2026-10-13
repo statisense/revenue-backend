@@ -34,7 +34,7 @@ export function PageHeader({
         <div className="mb-2.5 flex items-center gap-2">
           <div className="h-0.5 w-10 rounded-full bg-gradient-to-r from-brass via-brass-soft to-accent" />
           <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground/80">
-            Revenue console
+            NGRS · Revenue console
           </span>
         </div>
         <h1 className="text-2xl text-navy dark:text-foreground sm:text-[1.85rem]">{title}</h1>

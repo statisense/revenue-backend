@@ -93,13 +93,14 @@ export class OpsService {
     if (payment.status !== PaymentStatus.PAID && payment.status !== PaymentStatus.PARTIALLY_REFUNDED) {
       throw new BadRequestException('Only paid payments can be refunded');
     }
-    const alreadyRefunded = payment.refunds
+    const reserved = payment.refunds
       .filter((r) => r.status === PaymentStatus.PAID || r.status === PaymentStatus.PENDING)
       .reduce((s, r) => s + r.amountMinor, 0);
-    if (alreadyRefunded + dto.amountMinor > payment.amountMinor) {
-      throw new BadRequestException('Refund exceeds payment amount');
+    if (reserved + dto.amountMinor > payment.amountMinor) {
+      throw new BadRequestException('Refund exceeds payment amount (including pending requests)');
     }
 
+    // Dual-control: create as PENDING; payment status updates only on approve.
     const refund = await this.prisma.refund.create({
       data: {
         paymentId: payment.id,
@@ -110,31 +111,105 @@ export class OpsService {
       },
     });
 
-    const newStatus =
-      alreadyRefunded + dto.amountMinor >= payment.amountMinor
-        ? PaymentStatus.REFUNDED
-        : PaymentStatus.PARTIALLY_REFUNDED;
-
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: newStatus },
-    });
-
-    await this.prisma.refund.update({
-      where: { id: refund.id },
-      data: { status: PaymentStatus.PAID, processedAt: new Date(), providerRef: `RFN-${Date.now()}` },
-    });
-
     await this.audit.log({
       agencyId: payment.agencyId,
       actorId: actor.id,
       action: AuditAction.REFUND,
       entityType: 'Refund',
       entityId: refund.id,
-      after: { amountMinor: dto.amountMinor, paymentId: payment.id },
+      after: { amountMinor: dto.amountMinor, paymentId: payment.id, status: PaymentStatus.PENDING },
     });
 
-    return this.prisma.refund.findUniqueOrThrow({ where: { id: refund.id } });
+    return this.prisma.refund.findUniqueOrThrow({
+      where: { id: refund.id },
+      include: { payment: { select: { id: true, providerRef: true, amountMinor: true } } },
+    });
+  }
+
+  async approveRefund(actor: AuthUser, id: string) {
+    const refund = await this.prisma.refund.findUnique({
+      where: { id },
+      include: { payment: { include: { refunds: true } } },
+    });
+    if (!refund) throw new NotFoundException('Refund not found');
+    this.abac.assertAgencyAccess(actor, refund.payment.agencyId);
+    if (refund.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException('Only pending refunds can be approved');
+    }
+
+    const paidPortion = refund.payment.refunds
+      .filter((r) => r.status === PaymentStatus.PAID)
+      .reduce((s, r) => s + r.amountMinor, 0);
+    if (paidPortion + refund.amountMinor > refund.payment.amountMinor) {
+      throw new BadRequestException('Refund exceeds payment amount');
+    }
+
+    const newStatus =
+      paidPortion + refund.amountMinor >= refund.payment.amountMinor
+        ? PaymentStatus.REFUNDED
+        : PaymentStatus.PARTIALLY_REFUNDED;
+
+    await this.prisma.$transaction([
+      this.prisma.refund.update({
+        where: { id: refund.id },
+        data: {
+          status: PaymentStatus.PAID,
+          processedAt: new Date(),
+          providerRef: refund.providerRef || `RFN-${Date.now()}`,
+        },
+      }),
+      this.prisma.payment.update({
+        where: { id: refund.paymentId },
+        data: { status: newStatus },
+      }),
+    ]);
+
+    await this.audit.log({
+      agencyId: refund.payment.agencyId,
+      actorId: actor.id,
+      action: AuditAction.APPROVE,
+      entityType: 'Refund',
+      entityId: refund.id,
+      after: { status: PaymentStatus.PAID, paymentStatus: newStatus },
+    });
+
+    return this.prisma.refund.findUniqueOrThrow({
+      where: { id: refund.id },
+      include: { payment: { select: { id: true, providerRef: true, amountMinor: true } } },
+    });
+  }
+
+  async rejectRefund(actor: AuthUser, id: string, reason?: string) {
+    const refund = await this.prisma.refund.findUnique({
+      where: { id },
+      include: { payment: true },
+    });
+    if (!refund) throw new NotFoundException('Refund not found');
+    this.abac.assertAgencyAccess(actor, refund.payment.agencyId);
+    if (refund.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException('Only pending refunds can be rejected');
+    }
+
+    const updated = await this.prisma.refund.update({
+      where: { id: refund.id },
+      data: {
+        status: PaymentStatus.FAILED,
+        processedAt: new Date(),
+        reason: reason ? `${refund.reason ? `${refund.reason} · ` : ''}Rejected: ${reason}` : refund.reason,
+      },
+      include: { payment: { select: { id: true, providerRef: true, amountMinor: true } } },
+    });
+
+    await this.audit.log({
+      agencyId: refund.payment.agencyId,
+      actorId: actor.id,
+      action: AuditAction.REJECT,
+      entityType: 'Refund',
+      entityId: refund.id,
+      after: { status: PaymentStatus.FAILED, reason },
+    });
+
+    return updated;
   }
 
   async listRefunds(actor: AuthUser, agencyId?: string) {

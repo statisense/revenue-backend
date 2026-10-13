@@ -57,9 +57,12 @@ function resolveAmountMinor(t: RevenueType): number | null {
 }
 
 export default function RevenuePage() {
-  const [mode, setMode] = useState<'none' | 'category' | 'type' | 'edit-type'>('none');
+  const [mode, setMode] = useState<'none' | 'category' | 'type' | 'edit-type' | 'fee'>('none');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [feeTypeId, setFeeTypeId] = useState('');
+  const [feeName, setFeeName] = useState('Standard');
+  const [feeAmountMajor, setFeeAmountMajor] = useState('');
   const queryClient = useQueryClient();
 
   const categories = useQuery({
@@ -169,6 +172,27 @@ export default function RevenuePage() {
     setMode('edit-type');
   }
 
+  const addFee = useMutation({
+    mutationFn: () =>
+      api('/revenue/fees', {
+        method: 'POST',
+        body: {
+          revenueTypeId: feeTypeId,
+          name: feeName || 'Standard',
+          amountMinor: Math.round(Number(feeAmountMajor) * 100),
+        },
+      }),
+    onSuccess: async () => {
+      setMode('none');
+      setFeeTypeId('');
+      setFeeName('Standard');
+      setFeeAmountMajor('');
+      setFormError(null);
+      await queryClient.invalidateQueries({ queryKey: ['revenue-types'] });
+    },
+    onError: (err) => setFormError(err instanceof ApiError ? err.message : 'Fee schedule failed'),
+  });
+
   function closeForm() {
     setMode('none');
     setEditingId(null);
@@ -204,6 +228,15 @@ export default function RevenuePage() {
               Add category
             </Button>
             <Button
+              variant="outline"
+              onClick={() => {
+                setFormError(null);
+                setMode('fee');
+              }}
+            >
+              Add fee schedule
+            </Button>
+            <Button
               onClick={() => {
                 setFormError(null);
                 setEditingId(null);
@@ -223,6 +256,57 @@ export default function RevenuePage() {
           </div>
         }
       />
+
+      {mode === 'fee' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>New fee schedule</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="feeType">Revenue type</Label>
+              <select
+                id="feeType"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={feeTypeId}
+                onChange={(e) => setFeeTypeId(e.target.value)}
+              >
+                <option value="">Select revenue type</option>
+                {(types.data ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.code} — {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="feeName">Schedule name</Label>
+              <Input id="feeName" value={feeName} onChange={(e) => setFeeName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="feeAmount">Amount (NGN)</Label>
+              <Input
+                id="feeAmount"
+                value={feeAmountMajor}
+                onChange={(e) => setFeeAmountMajor(e.target.value)}
+                placeholder="e.g. 25000"
+              />
+            </div>
+            {formError && <p className="sm:col-span-2 text-sm text-red-700">{formError}</p>}
+            <div className="flex gap-2 sm:col-span-2">
+              <Button
+                disabled={!feeTypeId || !feeAmountMajor || addFee.isPending}
+                onClick={() => addFee.mutate()}
+              >
+                {addFee.isPending ? 'Saving…' : 'Save fee schedule'}
+              </Button>
+              <Button type="button" variant="ghost" onClick={closeForm}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {mode === 'category' && (
         <Card className="mb-6">

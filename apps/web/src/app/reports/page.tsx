@@ -311,7 +311,7 @@ export default function ReportsPage() {
     const a = document.createElement('a');
     a.href = url;
     const meta = packQuery.data.meta as ReportMeta | undefined;
-    a.download = `${meta ? buildDocId(meta) : `ncs-${selectedType}-${period}`}.csv`;
+    a.download = `${meta ? buildDocId(meta) : `ngrs-${selectedType}-${period}`}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

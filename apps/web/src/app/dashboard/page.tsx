@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   Bar,
@@ -12,17 +13,22 @@ import {
 } from 'recharts';
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
+  ClipboardList,
   Clock3,
+  FileText,
   Percent,
   Receipt,
   TrendingUp,
   Wallet,
   XCircle,
   Building2,
+  Banknote,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { formatMoney, formatNumber } from '@/lib/utils';
+import { displayAgencyCode, displayAgencyName, BRAND } from '@/lib/brand';
+import { formatMoney, formatNumber, cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ErrorState, LoadingState, PageHeader } from '@/components/page-shell';
@@ -51,6 +57,10 @@ type TenantInfo = {
   } | null;
 };
 
+type Assessment = { id: string; status: string };
+type Invoice = { id: string; status: string };
+type Refund = { id: string; status: string };
+
 function StatCard({
   title,
   value,
@@ -65,7 +75,7 @@ function StatCard({
   delay?: string;
 }) {
   return (
-    <Card className={`animate-fade-up ${delay ?? ''}`}>
+    <Card className={cn('animate-fade-up', delay)}>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
           <CardDescription className="text-[11px] uppercase tracking-[0.12em]">{title}</CardDescription>
@@ -80,6 +90,50 @@ function StatCard({
   );
 }
 
+function QueueLink({
+  href,
+  title,
+  count,
+  tone,
+  icon: Icon,
+}: {
+  href: string;
+  title: string;
+  count: number;
+  tone: 'warn' | 'danger' | 'info' | 'good';
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  const toneClass =
+    tone === 'warn'
+      ? 'border-brass/30 bg-brass/5'
+      : tone === 'danger'
+        ? 'border-red-200 bg-red-50/80 dark:border-red-900 dark:bg-red-950/30'
+        : tone === 'good'
+          ? 'border-accent/25 bg-accent/5'
+          : 'border-border bg-muted/30';
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'group flex items-center justify-between gap-3 rounded-lg border px-3.5 py-3 transition hover:border-accent/40 hover:shadow-panel',
+        toneClass,
+      )}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-navy text-white">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-navy dark:text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground tabular-nums">{formatNumber(count)} requiring attention</p>
+        </div>
+      </div>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-accent" />
+    </Link>
+  );
+}
+
 export default function DashboardPage() {
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['dashboard'],
@@ -90,6 +144,28 @@ export default function DashboardPage() {
     queryKey: ['tenant'],
     queryFn: () => api<TenantInfo>('/tenant'),
     retry: false,
+  });
+
+  const assessments = useQuery({
+    queryKey: ['assessments-queue'],
+    queryFn: async () => {
+      const res = await api<Assessment[] | Assessment>('/assessments');
+      return Array.isArray(res) ? res : res ? [res] : [];
+    },
+  });
+  const invoices = useQuery({
+    queryKey: ['invoices-queue'],
+    queryFn: async () => {
+      const res = await api<Invoice[] | Invoice>('/invoices');
+      return Array.isArray(res) ? res : res ? [res] : [];
+    },
+  });
+  const refunds = useQuery({
+    queryKey: ['refunds-queue'],
+    queryFn: async () => {
+      const res = await api<Refund[] | Refund>('/refunds');
+      return Array.isArray(res) ? res : res ? [res] : [];
+    },
   });
 
   if (isLoading) {
@@ -122,9 +198,15 @@ export default function DashboardPage() {
     amount: s.amountMinor / 100,
   }));
 
-  const agencyName =
-    tenant.data?.agency?.name ?? tenant.data?.agency?.legalName ?? 'Nigeria Customs';
-  const agencyCode = tenant.data?.agency?.code ?? tenant.data?.tenantCode ?? 'NCS';
+  const agencyName = displayAgencyName(
+    tenant.data?.agency?.name ?? tenant.data?.agency?.legalName,
+  );
+  const agencyCode = displayAgencyCode(tenant.data?.agency?.code ?? tenant.data?.tenantCode);
+
+  const pendingApprovals =
+    assessments.data?.filter((a) => a.status === 'PENDING_APPROVAL').length ?? 0;
+  const overdueInvoices = invoices.data?.filter((a) => a.status === 'OVERDUE').length ?? 0;
+  const pendingRefunds = refunds.data?.filter((r) => r.status === 'PENDING').length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -148,12 +230,50 @@ export default function DashboardPage() {
               <span className="text-base text-muted-foreground">({agencyCode})</span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Seeded demo data includes assessments, invoices, payments NCS202607000001–000005, and
-              treasury settlements.
+              {BRAND.tagline}. Demo payments use seeded codes NCS202607000001–000005.
             </p>
           </div>
         </CardContent>
       </Card>
+
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="h-0.5 w-6 rounded-full bg-gradient-to-r from-brass to-accent" />
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-brass-deep">
+            Needs action
+          </h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <QueueLink
+            href="/assessments"
+            title="Assessments awaiting approval"
+            count={pendingApprovals}
+            tone="warn"
+            icon={ClipboardList}
+          />
+          <QueueLink
+            href="/invoices"
+            title="Overdue invoices"
+            count={overdueInvoices}
+            tone="danger"
+            icon={FileText}
+          />
+          <QueueLink
+            href="/refunds"
+            title="Refunds pending dual control"
+            count={pendingRefunds}
+            tone="info"
+            icon={Wallet}
+          />
+          <QueueLink
+            href="/settlements"
+            title="Settlement batches pending"
+            count={data.settlementStatus.pending}
+            tone="good"
+            icon={Banknote}
+          />
+        </div>
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -202,7 +322,7 @@ export default function DashboardPage() {
           <CardContent className="h-72">
             {chartData.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No paid revenue sources yet. Run <code>pnpm db:seed</code> to load NCS mock collections.
+                No paid revenue sources yet. Run <code>pnpm db:seed</code> to load demo collections.
               </p>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -232,7 +352,7 @@ export default function DashboardPage() {
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-brass/20 bg-gradient-to-br from-muted/60 to-accent/5 p-4">
               <p className="text-sm text-muted-foreground">Pending settlement batches</p>
-              <p className="mt-1 font-serif text-3xl text-navy dark:text-foreground">
+              <p className="mt-1 font-serif text-3xl text-navy dark:text-foreground tabular-nums">
                 {formatNumber(data.settlementStatus.pending)}
               </p>
             </div>
@@ -241,6 +361,9 @@ export default function DashboardPage() {
               <p>Failed requests: {formatNumber(data.failed)}</p>
               <p>Expired requests: {formatNumber(data.expired)}</p>
             </div>
+            <Link href="/settlements" className="inline-flex items-center gap-1 text-sm text-accent hover:underline">
+              Open settlements <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </CardContent>
         </Card>
       </div>

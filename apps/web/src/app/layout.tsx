@@ -16,8 +16,8 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: 'Government Revenue Admin Portal',
-  description: 'Government Revenue Collection Platform',
+  title: 'Nigeria Government Revenue System',
+  description: 'National revenue assessment, billing, collection, and treasury platform',
 };
 
 export const viewport: Viewport = {

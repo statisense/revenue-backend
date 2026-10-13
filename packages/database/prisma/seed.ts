@@ -294,23 +294,23 @@ async function seedBanks(): Promise<void> {
 
 async function seedAgencyAndBranches() {
   const agencyData = {
-    name: 'Nigeria Customs',
-    shortName: 'NCS',
+    name: 'Nigeria Government Revenue System',
+    shortName: 'NGRS',
     status: 'ACTIVE' as const,
-    email: 'revenue@customs.gov.ng',
+    email: 'revenue@ngrs.gov.ng',
     phone: '+23412700000',
-    website: 'https://customs.gov.ng',
-    logoUrl: 'https://customs.gov.ng/assets/logo.png',
+    website: 'https://revenue.gov.ng',
+    logoUrl: null,
     address: 'Abuja, Federal Capital Territory',
     state: 'FCT',
     country: 'NG',
     defaultCurrency: 'NGN',
     paymentCodeStyle: 'AGENCY_DATE_SEQ',
     metadata: {
-      sector: 'customs',
+      sector: 'government-revenue',
       regulator: 'Federal Ministry of Finance',
       tin: '01234567-0001',
-      commands: ['Apapa', 'Tin Can', 'Onne', 'Calabar', 'Warri'],
+      platform: 'Nigeria Government Revenue System',
     },
   };
 
@@ -2048,7 +2048,7 @@ async function seedTransactionalData(
       currency: 'NGN',
       paymentReference: 'NCS-PAYREF-2026-000002',
       invoiceNumber: 'NCS-INV-2026-000002',
-      agencyName: 'Nigeria Customs',
+      agencyName: 'Nigeria Government Revenue System',
       officerName: 'Ibrahim Bello',
       qrVerification:
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
