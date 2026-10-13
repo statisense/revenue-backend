@@ -178,28 +178,33 @@ export default function RefundsPage() {
         <DataTable
           searchPlaceholder="Search refund, payment, reason…"
           columns={[
-            { key: 'id', label: 'Refund' },
-            { key: 'payment', label: 'Payment' },
-            { key: 'amount', label: 'Amount' },
-            { key: 'status', label: 'Status' },
+            { key: 'id', label: 'Refund', primary: true, mono: true, sticky: 'left' },
+            { key: 'payment', label: 'Payment', mono: true },
+            { key: 'amount', label: 'Amount', align: 'right' },
+            { key: 'status', label: 'Status', align: 'center' },
             { key: 'reason', label: 'Reason' },
             { key: 'created', label: 'Created' },
-            { key: 'actions', label: 'Actions' },
+            { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
           rows={list.data.map((r) => ({
             __id: r.id,
             __search: `${r.id} ${r.payment?.providerRef ?? ''} ${r.payment?.id ?? ''} ${r.status} ${r.reason ?? ''}`,
-            id: r.id.slice(0, 10),
-            payment: r.payment?.providerRef ?? r.payment?.id?.slice(0, 10) ?? '—',
-            amount: formatMoney(r.amountMinor),
+            id: <span className="cell-code">{r.id.slice(0, 10)}</span>,
+            payment: (
+              <span className="font-mono text-xs text-muted-foreground">
+                {r.payment?.providerRef ?? r.payment?.id?.slice(0, 10) ?? '—'}
+              </span>
+            ),
+            amount: <span className="cell-money">{formatMoney(r.amountMinor)}</span>,
             status: <Badge variant={statusVariant(r.status)}>{r.status}</Badge>,
-            reason: r.reason ?? '—',
-            created: formatDate(r.createdAt),
+            reason: <span className="cell-meta max-w-[14rem]">{r.reason ?? '—'}</span>,
+            created: <span className="whitespace-nowrap text-muted-foreground">{formatDate(r.createdAt)}</span>,
             actions:
               r.status === 'PENDING' ? (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap justify-end gap-1.5">
                   <Button
                     size="sm"
+                    className="h-8"
                     disabled={decide.isPending}
                     onClick={() => decide.mutate({ id: r.id, path: 'approve' })}
                   >
@@ -208,6 +213,7 @@ export default function RefundsPage() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="h-8"
                     disabled={decide.isPending}
                     onClick={() => decide.mutate({ id: r.id, path: 'reject' })}
                   >
@@ -215,7 +221,7 @@ export default function RefundsPage() {
                   </Button>
                 </div>
               ) : (
-                '—'
+                <span className="text-muted-foreground">—</span>
               ),
           }))}
         />

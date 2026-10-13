@@ -125,10 +125,10 @@ export default function GatewaysPage() {
         <DataTable
           searchPlaceholder="Search provider…"
           columns={[
-            { key: 'provider', label: 'Provider' },
-            { key: 'active', label: 'Active' },
-            { key: 'default', label: 'Default' },
-            { key: 'secret', label: 'Secret configured' },
+            { key: 'provider', label: 'Provider', primary: true },
+            { key: 'active', label: 'Active', align: 'center' },
+            { key: 'default', label: 'Default', align: 'center' },
+            { key: 'secret', label: 'Secret configured', align: 'center' },
             { key: 'updated', label: 'Updated' },
           ]}
           rows={list.data.map((g) => ({

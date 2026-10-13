@@ -126,10 +126,10 @@ export default function AuditPage() {
           searchPlaceholder="Search action, entity, actor, IP…"
           columns={[
             { key: 'when', label: 'When' },
-            { key: 'action', label: 'Action' },
-            { key: 'entity', label: 'Entity' },
-            { key: 'actor', label: 'Actor' },
-            { key: 'ip', label: 'IP' },
+            { key: 'action', label: 'Action', primary: true },
+            { key: 'entity', label: 'Entity', mono: true },
+            { key: 'actor', label: 'Actor', mono: true },
+            { key: 'ip', label: 'IP', mono: true },
           ]}
           rows={filtered.map((row) => {
             const entity = `${row.entityType}${row.entityId ? ` · ${row.entityId.slice(0, 8)}` : ''}`;

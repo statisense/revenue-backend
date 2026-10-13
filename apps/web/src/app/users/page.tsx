@@ -149,11 +149,11 @@ export default function UsersPage() {
         <DataTable
           searchPlaceholder="Search name, email, role…"
           columns={[
-            { key: 'name', label: 'Name' },
+            { key: 'name', label: 'Name', primary: true, sticky: 'left' },
             { key: 'email', label: 'Email' },
             { key: 'roles', label: 'Roles' },
-            { key: 'status', label: 'Status' },
-            { key: 'actions', label: 'Actions' },
+            { key: 'status', label: 'Status', align: 'center' },
+            { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
           rows={data.map((u) => {
             const roles = (u.roles ?? []).map((r) => r.code || r.name).filter(Boolean).join(', ') || '—';
@@ -161,17 +161,17 @@ export default function UsersPage() {
             return {
               __id: u.id,
               __search: `${name} ${u.email} ${roles} ${u.status ?? ''}`,
-              name,
-              email: u.email,
-              roles,
+              name: <span className="cell-primary">{name}</span>,
+              email: <span className="cell-meta">{u.email}</span>,
+              roles: <span className="text-xs text-muted-foreground">{roles}</span>,
               status: <Badge variant={u.status === 'ACTIVE' ? 'success' : 'muted'}>{u.status || '—'}</Badge>,
               actions:
                 u.status === 'ACTIVE' ? (
-                  <Button size="sm" variant="outline" onClick={() => deactivate.mutate(u.id)}>
+                  <Button size="sm" variant="outline" className="h-8" onClick={() => deactivate.mutate(u.id)}>
                     Deactivate
                   </Button>
                 ) : (
-                  '—'
+                  <span className="text-muted-foreground">—</span>
                 ),
             };
           })}

@@ -114,9 +114,9 @@ export default function NotificationsPage() {
           searchPlaceholder="Search recipient, subject, channel…"
           columns={[
             { key: 'channel', label: 'Channel' },
-            { key: 'recipient', label: 'Recipient' },
+            { key: 'recipient', label: 'Recipient', primary: true },
             { key: 'subject', label: 'Subject' },
-            { key: 'status', label: 'Status' },
+            { key: 'status', label: 'Status', align: 'center' },
             { key: 'created', label: 'Created' },
           ]}
           rows={list.data.map((n) => ({

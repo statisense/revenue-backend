@@ -212,18 +212,18 @@ export default function TaxesPage() {
         <DataTable
           searchPlaceholder="Search code, name, rate…"
           columns={[
-            { key: 'code', label: 'Code' },
-            { key: 'name', label: 'Name' },
-            { key: 'rate', label: 'Rate' },
+            { key: 'code', label: 'Code', primary: true, mono: true, sticky: 'left' },
+            { key: 'name', label: 'Name', primary: true },
+            { key: 'rate', label: 'Rate', align: 'right' },
             { key: 'description', label: 'Description' },
-            { key: 'actions', label: 'Actions' },
+            { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
           rows={taxes.data.map((t) => ({
             __id: t.id,
             __search: `${t.code} ${t.name} ${formatRate(t.ratePercent)} ${t.description ?? ''}`,
-            code: <span className="font-medium">{t.code}</span>,
-            name: t.name,
-            rate: <span className="tabular-nums font-medium">{formatRate(t.ratePercent)}</span>,
+            code: <span className="cell-code">{t.code}</span>,
+            name: <span className="cell-primary">{t.name}</span>,
+            rate: <span className="cell-money">{formatRate(t.ratePercent)}</span>,
             description: t.description || '—',
             actions: (
               <Button size="sm" variant="outline" onClick={() => openEdit(t)}>

@@ -129,13 +129,13 @@ export default function PaymentsPage() {
         <DataTable
           searchPlaceholder="Search code, invoice, payer, status…"
           columns={[
-            { key: 'code', label: 'Code' },
+            { key: 'code', label: 'Code', primary: true, mono: true, sticky: 'left' },
             { key: 'invoice', label: 'Invoice / payer' },
-            { key: 'amount', label: 'Amount' },
+            { key: 'amount', label: 'Amount', align: 'right' },
             { key: 'va', label: 'Virtual account' },
-            { key: 'status', label: 'Status' },
+            { key: 'status', label: 'Status', align: 'center' },
             { key: 'expires', label: 'Expires' },
-            { key: 'actions', label: 'Actions' },
+            { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
           rows={requests.data.map((p) => ({
             __id: p.id,
@@ -150,29 +150,39 @@ export default function PaymentsPage() {
             ]
               .filter(Boolean)
               .join(' '),
-            code: <span className="font-medium">{p.paymentCode}</span>,
+            code: <span className="cell-code">{p.paymentCode}</span>,
             invoice: (
-              <div>
-                <div>{p.invoice?.invoiceNumber || '—'}</div>
-                <div className="text-xs text-muted-foreground">{p.invoice?.payerName || '—'}</div>
+              <div className="cell-stack">
+                <div className="cell-primary">{p.invoice?.invoiceNumber || '—'}</div>
+                <div className="cell-meta">{p.invoice?.payerName || '—'}</div>
               </div>
             ),
-            amount: formatMoney(p.amountMinor),
-            va: p.virtualAccount
-              ? `${p.virtualAccount.bankName} ${p.virtualAccount.accountNumber}`
-              : '—',
+            amount: <span className="cell-money">{formatMoney(p.amountMinor)}</span>,
+            va: p.virtualAccount ? (
+              <div className="cell-stack">
+                <div className="cell-primary">{p.virtualAccount.bankName}</div>
+                <div className="cell-meta font-mono tabular-nums">{p.virtualAccount.accountNumber}</div>
+              </div>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            ),
             status: <Badge variant={statusVariant(p.status)}>{p.status}</Badge>,
-            expires: formatDate(p.expiresAt),
+            expires: <span className="whitespace-nowrap text-muted-foreground">{formatDate(p.expiresAt)}</span>,
             actions: (
-              <div className="flex flex-col gap-1">
+              <div className="flex min-w-[11rem] flex-col items-end gap-1.5">
                 {p.payUrl && (
-                  <a className="text-xs text-accent underline" href={p.payUrl} target="_blank" rel="noreferrer">
+                  <a
+                    className="text-xs font-medium text-accent underline-offset-2 hover:underline"
+                    href={p.payUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     Open pay page
                   </a>
                 )}
                 {p.status === 'PENDING' && (
                   <>
-                    <div className="flex min-w-[12rem] max-w-[18rem] flex-col gap-1 sm:flex-row">
+                    <div className="flex w-full max-w-[16rem] flex-col gap-1 sm:flex-row sm:items-center">
                       <Input
                         className="h-8 min-w-0 flex-1 text-xs"
                         placeholder="Email to share"
@@ -182,7 +192,7 @@ export default function PaymentsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="shrink-0"
+                        className="h-8 shrink-0"
                         disabled={!shareEmail || share.isPending}
                         onClick={() => share.mutate({ code: p.paymentCode, recipient: shareEmail })}
                       >
@@ -190,7 +200,7 @@ export default function PaymentsPage() {
                       </Button>
                     </div>
                     {process.env.NODE_ENV !== 'production' && (
-                      <Button size="sm" variant="outline" onClick={() => simulate.mutate(p.paymentCode)}>
+                      <Button size="sm" variant="outline" className="h-8" onClick={() => simulate.mutate(p.paymentCode)}>
                         Simulate
                       </Button>
                     )}
@@ -198,12 +208,12 @@ export default function PaymentsPage() {
                 )}
                 {p.payments?.[0]?.receipt?.receiptNumber && (
                   <a
-                    className="text-xs font-medium text-accent underline"
+                    className="text-xs font-medium text-accent underline-offset-2 hover:underline"
                     href={`/receipts/${encodeURIComponent(p.payments[0].receipt.receiptNumber)}`}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    View receipt {p.payments[0].receipt.receiptNumber}
+                    Receipt {p.payments[0].receipt.receiptNumber}
                   </a>
                 )}
               </div>

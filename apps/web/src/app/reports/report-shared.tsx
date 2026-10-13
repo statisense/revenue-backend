@@ -288,22 +288,22 @@ export function DataTable({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border/90 bg-card shadow-panel print:shadow-none">
+    <div className="overflow-hidden rounded-xl border border-border/90 bg-card shadow-panel print:shadow-none">
       <div className="h-0.5 w-full bg-gradient-to-r from-navy via-brass to-accent" />
       {caption ? (
-        <p className="border-b border-border/70 bg-muted/30 px-3 py-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground sm:px-4">
+        <p className="border-b border-border/70 bg-gradient-to-r from-navy/[0.03] via-muted/40 to-accent/[0.04] px-3.5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:px-4">
           {caption}
         </p>
       ) : null}
       <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-border bg-gradient-to-r from-muted/80 via-muted/50 to-muted/30">
+        <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+          <thead>
             <tr>
               {headers.map((h) => (
                 <th
                   key={h.label}
                   className={cn(
-                    'whitespace-nowrap px-3 py-3 text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:px-4',
+                    'whitespace-nowrap border-b border-border/90 bg-[#F3F6FA] px-3.5 py-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:bg-navy-800 sm:px-4',
                     h.align === 'right' && 'text-right',
                   )}
                 >
@@ -312,10 +312,10 @@ export function DataTable({
               ))}
             </tr>
           </thead>
-          <tbody className="[&_tr]:border-b [&_tr]:border-border/70 [&_tr]:transition-colors [&_tr]:last:border-0 [&_tr:hover]:bg-accent/[0.04] [&_td]:px-3 [&_td]:py-2.5 [&_td]:align-middle sm:[&_td]:px-4">
+          <tbody className="[&_tr]:border-b [&_tr]:border-border/60 [&_tr]:transition-colors [&_tr]:last:border-0 [&_tr:nth-child(odd)]:bg-[#FBFCFD] [&_tr:hover]:bg-[#F3F8F5] dark:[&_tr:nth-child(odd)]:bg-white/[0.02] dark:[&_tr:hover]:bg-accent/[0.08] [&_td]:px-3.5 [&_td]:py-3 [&_td]:align-middle sm:[&_td]:px-4">
             {empty ? (
               <tr>
-                <td colSpan={colSpan} className="!px-4 !py-10 text-center text-muted-foreground">
+                <td colSpan={colSpan} className="!px-4 !py-12 text-center text-muted-foreground">
                   No rows for this reporting period.
                 </td>
               </tr>
@@ -324,7 +324,7 @@ export function DataTable({
             )}
           </tbody>
           {footer && !empty ? (
-            <tfoot className="border-t border-border bg-muted/40 font-medium [&_td]:px-3 [&_td]:py-3 sm:[&_td]:px-4">
+            <tfoot className="border-t border-border bg-muted/35 font-medium [&_td]:px-3.5 [&_td]:py-3.5 sm:[&_td]:px-4">
               {footer}
             </tfoot>
           ) : null}

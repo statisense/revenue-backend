@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { DataTable, ErrorState, Label, LoadingState, PageHeader } from '@/components/page-shell';
+import { DataTable, ErrorState, Label, LoadingState, MiniTable, PageHeader } from '@/components/page-shell';
 
 type Branch = { id: string; code: string; name: string; state?: string | null };
 type TsaMapping = {
@@ -190,27 +190,38 @@ export default function AgenciesPage() {
         <DataTable
           searchPlaceholder="Search code, name, contact, state…"
           columns={[
-            { key: 'code', label: 'Code' },
-            { key: 'name', label: 'Name' },
-            { key: 'branches', label: 'Branches' },
+            { key: 'code', label: 'Code', primary: true, mono: true, sticky: 'left' },
+            { key: 'name', label: 'Name', primary: true },
+            { key: 'branches', label: 'Branches', align: 'center' },
             { key: 'contact', label: 'Contact' },
             { key: 'state', label: 'State' },
-            { key: 'status', label: 'Status' },
-            { key: 'actions', label: '' },
+            { key: 'status', label: 'Status', align: 'center' },
+            { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
           rows={data.map((a) => ({
             __id: a.id,
             __search: `${a.code} ${a.name} ${a.email ?? ''} ${a.phone ?? ''} ${a.state ?? ''} ${a.status}`,
-            code: <span className="font-medium">{a.code === 'NCS' ? 'NGRS' : a.code}</span>,
-            name: displayAgencyName(a.name),
-            branches: a.branches?.length ?? 0,
-            contact: a.email || a.phone || '—',
-            state: a.state || '—',
+            code: <span className="cell-code">{a.code === 'NCS' ? 'NGRS' : a.code}</span>,
+            name: <span className="cell-primary">{displayAgencyName(a.name)}</span>,
+            branches: (
+              <span className="inline-flex min-w-8 justify-center rounded-md bg-muted/80 px-2 py-0.5 text-xs font-medium tabular-nums">
+                {a.branches?.length ?? 0}
+              </span>
+            ),
+            contact: (
+              <div className="cell-stack">
+                <div className="cell-meta" title={a.email || undefined}>
+                  {a.email || '—'}
+                </div>
+                {a.phone ? <div className="cell-meta tabular-nums">{a.phone}</div> : null}
+              </div>
+            ),
+            state: <span className="text-muted-foreground">{a.state || '—'}</span>,
             status: (
               <Badge variant={a.status === 'ACTIVE' ? 'success' : 'muted'}>{a.status}</Badge>
             ),
             actions: (
-              <Button size="sm" variant="outline" onClick={() => setSelectedId(a.id)}>
+              <Button size="sm" variant="outline" className="h-8" onClick={() => setSelectedId(a.id)}>
                 Manage
               </Button>
             ),
@@ -239,32 +250,22 @@ export default function AgenciesPage() {
               <>
                 <div>
                   <h3 className="mb-3 font-serif text-lg">Branches</h3>
-                  <div className="mb-4 overflow-hidden rounded-lg border border-border">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2">Code</th>
-                          <th className="px-3 py-2">Name</th>
-                          <th className="px-3 py-2">State</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(detail.data.branches ?? []).map((b) => (
-                          <tr key={b.id} className="border-t border-border">
-                            <td className="px-3 py-2 font-mono text-xs">{b.code}</td>
-                            <td className="px-3 py-2">{b.name}</td>
-                            <td className="px-3 py-2">{b.state || '—'}</td>
-                          </tr>
-                        ))}
-                        {!detail.data.branches?.length && (
-                          <tr>
-                            <td colSpan={3} className="px-3 py-6 text-center text-muted-foreground">
-                              No branches yet
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                  <div className="mb-4">
+                    <MiniTable
+                      headers={[{ label: 'Code' }, { label: 'Name' }, { label: 'State' }]}
+                      empty="No branches yet"
+                      rows={(detail.data.branches ?? []).map((b) => [
+                        <span key={`${b.id}-c`} className="cell-code">
+                          {b.code}
+                        </span>,
+                        <span key={`${b.id}-n`} className="cell-primary">
+                          {b.name}
+                        </span>,
+                        <span key={`${b.id}-s`} className="text-muted-foreground">
+                          {b.state || '—'}
+                        </span>,
+                      ])}
+                    />
                   </div>
                   <form
                     className="grid gap-3 sm:grid-cols-4"
@@ -282,33 +283,25 @@ export default function AgenciesPage() {
 
                 <div>
                   <h3 className="mb-3 font-serif text-lg">TSA mappings</h3>
-                  <div className="overflow-hidden rounded-lg border border-border">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2">Account</th>
-                          <th className="px-3 py-2">Name</th>
-                          <th className="px-3 py-2">Default</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(detail.data.tsaMappings ?? []).map((t) => (
-                          <tr key={t.id} className="border-t border-border">
-                            <td className="px-3 py-2 font-mono text-xs">{t.tsaAccountNumber || '—'}</td>
-                            <td className="px-3 py-2">{t.tsaAccountName || '—'}</td>
-                            <td className="px-3 py-2">{t.isDefault ? 'Yes' : '—'}</td>
-                          </tr>
-                        ))}
-                        {!detail.data.tsaMappings?.length && (
-                          <tr>
-                            <td colSpan={3} className="px-3 py-6 text-center text-muted-foreground">
-                              No TSA mappings configured for this agency yet
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  <MiniTable
+                    headers={[{ label: 'Account' }, { label: 'Name' }, { label: 'Default' }]}
+                    empty="No TSA mappings configured for this agency yet"
+                    rows={(detail.data.tsaMappings ?? []).map((t) => [
+                      <span key={`${t.id}-a`} className="cell-code">
+                        {t.tsaAccountNumber || '—'}
+                      </span>,
+                      <span key={`${t.id}-n`}>{t.tsaAccountName || '—'}</span>,
+                      t.isDefault ? (
+                        <Badge key={`${t.id}-d`} variant="success">
+                          Default
+                        </Badge>
+                      ) : (
+                        <span key={`${t.id}-d`} className="text-muted-foreground">
+                          —
+                        </span>
+                      ),
+                    ])}
+                  />
                 </div>
               </>
             )}

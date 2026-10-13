@@ -33,22 +33,27 @@ export default function VirtualAccountsPage() {
         <DataTable
           searchPlaceholder="Search code, account, bank…"
           columns={[
-            { key: 'code', label: 'Payment code' },
-            { key: 'account', label: 'Account' },
+            { key: 'code', label: 'Payment code', primary: true, mono: true, sticky: 'left' },
+            { key: 'account', label: 'Account', mono: true },
             { key: 'bank', label: 'Bank' },
-            { key: 'amount', label: 'Amount' },
-            { key: 'status', label: 'Status' },
+            { key: 'amount', label: 'Amount', align: 'right' },
+            { key: 'status', label: 'Status', align: 'center' },
             { key: 'expires', label: 'Expires' },
           ]}
           rows={list.data.map((v) => ({
             __id: v.id,
             __search: `${v.paymentRequest?.paymentCode ?? ''} ${v.accountNumber} ${v.accountName} ${v.bankName} ${v.status}`,
-            code: v.paymentRequest?.paymentCode ?? '—',
-            account: `${v.accountNumber} (${v.accountName})`,
-            bank: v.bankName,
-            amount: formatMoney(v.paymentRequest?.amountMinor ?? 0),
-            status: <Badge>{v.status}</Badge>,
-            expires: formatDate(v.expiresAt),
+            code: <span className="cell-code">{v.paymentRequest?.paymentCode ?? '—'}</span>,
+            account: (
+              <div className="cell-stack">
+                <div className="cell-primary font-mono tabular-nums">{v.accountNumber}</div>
+                <div className="cell-meta">{v.accountName}</div>
+              </div>
+            ),
+            bank: <span className="text-muted-foreground">{v.bankName}</span>,
+            amount: <span className="cell-money">{formatMoney(v.paymentRequest?.amountMinor ?? 0)}</span>,
+            status: <Badge variant="outline">{v.status}</Badge>,
+            expires: <span className="whitespace-nowrap text-muted-foreground">{formatDate(v.expiresAt)}</span>,
           }))}
         />
       )}

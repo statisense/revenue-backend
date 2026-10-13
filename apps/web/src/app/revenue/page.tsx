@@ -433,12 +433,12 @@ export default function RevenuePage() {
         <DataTable
           searchPlaceholder="Search code, name, category, GL…"
           columns={[
-            { key: 'code', label: 'Code' },
-            { key: 'name', label: 'Name' },
+            { key: 'code', label: 'Code', primary: true, mono: true, sticky: 'left' },
+            { key: 'name', label: 'Name', primary: true },
             { key: 'category', label: 'Category' },
-            { key: 'amount', label: 'Default fee' },
-            { key: 'gl', label: 'GL' },
-            { key: 'actions', label: 'Actions' },
+            { key: 'amount', label: 'Default fee', align: 'right' },
+            { key: 'gl', label: 'GL', mono: true },
+            { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
           rows={types.data.map((t) => {
             const amount = resolveAmountMinor(t);
@@ -449,13 +449,13 @@ export default function RevenuePage() {
             return {
               __id: t.id,
               __search: `${t.code} ${t.name} ${categoryName} ${t.glCode || ''}`,
-              code: <span className="font-medium">{t.code}</span>,
-              name: t.name,
-              category: categoryName,
-              amount: amount != null ? formatMoney(amount) : '—',
-              gl: t.glCode || '—',
+              code: <span className="cell-code">{t.code}</span>,
+              name: <span className="cell-primary">{t.name}</span>,
+              category: <span className="text-muted-foreground">{categoryName}</span>,
+              amount: amount != null ? <span className="cell-money">{formatMoney(amount)}</span> : '—',
+              gl: <span className="font-mono text-xs text-muted-foreground">{t.glCode || '—'}</span>,
               actions: (
-                <Button size="sm" variant="outline" onClick={() => openEdit(t)}>
+                <Button size="sm" variant="outline" className="h-8" onClick={() => openEdit(t)}>
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
                 </Button>

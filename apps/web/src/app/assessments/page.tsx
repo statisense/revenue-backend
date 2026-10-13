@@ -302,47 +302,47 @@ export default function AssessmentsPage() {
         <DataTable
           searchPlaceholder="Search number, payer, status…"
           columns={[
-            { key: 'number', label: 'Number' },
-            { key: 'payer', label: 'Payer' },
-            { key: 'amount', label: 'Amount' },
-            { key: 'status', label: 'Status' },
+            { key: 'number', label: 'Number', primary: true, mono: true, sticky: 'left' },
+            { key: 'payer', label: 'Payer', primary: true },
+            { key: 'amount', label: 'Amount', align: 'right' },
+            { key: 'status', label: 'Status', align: 'center' },
             { key: 'created', label: 'Created' },
-            { key: 'actions', label: 'Actions' },
+            { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
           rows={list.data.map((a) => ({
             __id: a.id,
             __search: `${a.assessmentNumber || ''} ${a.id} ${a.payerName} ${a.status}`,
-            number: a.assessmentNumber || a.id.slice(0, 8),
-            payer: a.payerName,
+            number: <span className="cell-code">{a.assessmentNumber || a.id.slice(0, 8)}</span>,
+            payer: <span className="cell-primary">{a.payerName}</span>,
             amount: (
-              <div className="space-y-0.5">
-                <div className="font-medium">{formatMoney(a.totalMinor)}</div>
+              <div className="space-y-0.5 text-right">
+                <div className="cell-money">{formatMoney(a.totalMinor)}</div>
                 {(a.taxMinor ?? 0) > 0 ? (
                   <div className="text-xs text-muted-foreground">incl. tax {formatMoney(a.taxMinor ?? 0)}</div>
                 ) : null}
               </div>
             ),
             status: <Badge variant={statusVariant(a.status)}>{a.status}</Badge>,
-            created: formatDate(a.createdAt),
+            created: <span className="whitespace-nowrap text-muted-foreground">{formatDate(a.createdAt)}</span>,
             actions: (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap justify-end gap-1.5">
                 {(a.status === 'DRAFT' || a.status === 'REJECTED') && (
-                  <Button size="sm" variant="outline" onClick={() => action.mutate({ id: a.id, path: 'submit' })}>
+                  <Button size="sm" variant="outline" className="h-8" onClick={() => action.mutate({ id: a.id, path: 'submit' })}>
                     Submit
                   </Button>
                 )}
                 {a.status === 'PENDING_APPROVAL' && (
                   <>
-                    <Button size="sm" onClick={() => action.mutate({ id: a.id, path: 'approve' })}>
+                    <Button size="sm" className="h-8" onClick={() => action.mutate({ id: a.id, path: 'approve' })}>
                       Approve
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => action.mutate({ id: a.id, path: 'reject' })}>
+                    <Button size="sm" variant="outline" className="h-8" onClick={() => action.mutate({ id: a.id, path: 'reject' })}>
                       Reject
                     </Button>
                   </>
                 )}
                 {a.status === 'APPROVED' && (
-                  <Button size="sm" onClick={() => invoiceFrom.mutate(a.id)}>
+                  <Button size="sm" className="h-8" onClick={() => invoiceFrom.mutate(a.id)}>
                     Invoice
                   </Button>
                 )}

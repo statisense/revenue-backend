@@ -488,35 +488,35 @@ export default function InvoicesPage() {
         <DataTable
           searchPlaceholder="Search invoice, payer, status…"
           columns={[
-            { key: 'number', label: 'Invoice' },
+            { key: 'number', label: 'Invoice', primary: true, mono: true, sticky: 'left' },
             { key: 'payer', label: 'Payer' },
-            { key: 'amount', label: 'Amount' },
-            { key: 'status', label: 'Status' },
+            { key: 'amount', label: 'Amount', align: 'right' },
+            { key: 'status', label: 'Status', align: 'center' },
             { key: 'due', label: 'Due' },
-            { key: 'actions', label: 'Actions' },
+            { key: 'actions', label: '', sticky: 'right', align: 'right' },
           ]}
           rows={list.data.map((inv) => {
             const mutable = canMutateInvoice(inv);
             return {
               __id: inv.id,
               __search: `${inv.invoiceNumber} ${inv.payerName} ${inv.payerEmail ?? ''} ${inv.payerPhone ?? ''} ${inv.status} ${inv.totalMinor}`,
-              number: <span className="font-medium">{inv.invoiceNumber}</span>,
+              number: <span className="cell-code">{inv.invoiceNumber}</span>,
               payer: (
-                <div className="min-w-[10rem] space-y-0.5">
-                  <div className="font-medium leading-snug">{inv.payerName}</div>
+                <div className="cell-stack">
+                  <div className="cell-primary">{inv.payerName}</div>
                   {inv.payerEmail ? (
-                    <div className="truncate text-xs text-muted-foreground" title={inv.payerEmail}>
+                    <div className="cell-meta" title={inv.payerEmail}>
                       {inv.payerEmail}
                     </div>
                   ) : null}
                   {inv.payerPhone ? (
-                    <div className="text-xs tabular-nums text-muted-foreground">{inv.payerPhone}</div>
+                    <div className="cell-meta tabular-nums">{inv.payerPhone}</div>
                   ) : null}
                 </div>
               ),
               amount: (
-                <div className="space-y-0.5">
-                  <div className="font-medium">{formatMoney(inv.totalMinor)}</div>
+                <div className="space-y-0.5 text-right">
+                  <div className="cell-money">{formatMoney(inv.totalMinor)}</div>
                   {(inv.taxMinor ?? 0) > 0 ? (
                     <div className="text-xs text-muted-foreground">
                       Base {formatMoney(inv.subtotalMinor ?? inv.totalMinor - (inv.taxMinor ?? 0))} + tax{' '}
@@ -526,12 +526,12 @@ export default function InvoicesPage() {
                 </div>
               ),
               status: <Badge variant={statusVariant(inv.status)}>{inv.status}</Badge>,
-              due: formatDate(inv.dueAt),
+              due: <span className="whitespace-nowrap text-muted-foreground">{formatDate(inv.dueAt)}</span>,
               actions: (
-                <div className="flex flex-wrap gap-1">
+                <div className="table-actions">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     title="View details"
                     onClick={() => openView(inv.id)}
                   >
@@ -539,7 +539,7 @@ export default function InvoicesPage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     title={mutable ? 'Edit invoice' : 'Cannot edit paid or cancelled invoices'}
                     disabled={!mutable}
                     onClick={() => openEdit(inv.id)}
@@ -548,7 +548,7 @@ export default function InvoicesPage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     title={mutable ? 'Cancel invoice' : 'Cannot cancel paid or cancelled invoices'}
                     disabled={!mutable || cancelInvoice.isPending}
                     onClick={() => onCancelClick(inv)}

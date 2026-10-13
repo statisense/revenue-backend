@@ -123,21 +123,21 @@ export default function SettlementsPage() {
           <DataTable
             searchPlaceholder="Search batch, status, TSA ref…"
             columns={[
-              { key: 'number', label: 'Batch' },
-              { key: 'amount', label: 'Total' },
-              { key: 'status', label: 'Status' },
+              { key: 'number', label: 'Batch', primary: true, mono: true, sticky: 'left' },
+              { key: 'amount', label: 'Total', align: 'right' },
+              { key: 'status', label: 'Status', align: 'center' },
               { key: 'created', label: 'Created' },
-              { key: 'actions', label: '' },
+              { key: 'actions', label: '', sticky: 'right', align: 'right' },
             ]}
             rows={batches.data.map((b) => ({
               __id: b.id,
               __search: `${b.batchNumber || ''} ${b.id} ${b.status} ${b.tsaReference || ''}`,
-              number: b.batchNumber || b.id.slice(0, 8),
-              amount: formatMoney(b.totalMinor ?? 0),
+              number: <span className="cell-code">{b.batchNumber || b.id.slice(0, 8)}</span>,
+              amount: <span className="cell-money">{formatMoney(b.totalMinor ?? 0)}</span>,
               status: (
                 <Badge variant={b.status === 'SETTLED' ? 'success' : 'warning'}>{b.status}</Badge>
               ),
-              created: formatDate(b.createdAt),
+              created: <span className="whitespace-nowrap text-muted-foreground">{formatDate(b.createdAt)}</span>,
               actions:
                 b.status === 'PENDING' ? (
                   <Button size="sm" variant="outline" onClick={() => setSettleId(b.id)}>
@@ -169,20 +169,20 @@ export default function SettlementsPage() {
         <DataTable
           searchPlaceholder="Search ID, reference, status…"
           columns={[
-            { key: 'id', label: 'ID' },
-            { key: 'ref', label: 'Reference' },
-            { key: 'amount', label: 'Amount' },
-            { key: 'status', label: 'Status' },
+            { key: 'id', label: 'ID', primary: true, mono: true },
+            { key: 'ref', label: 'Reference', mono: true },
+            { key: 'amount', label: 'Amount', align: 'right' },
+            { key: 'status', label: 'Status', align: 'center' },
             { key: 'created', label: 'Created' },
           ]}
           rows={settlements.data.map((s) => ({
             __id: s.id,
             __search: `${s.id} ${s.paymentReference || ''} ${s.status}`,
-            id: s.id.slice(0, 8),
-            ref: s.paymentReference || '—',
-            amount: formatMoney(s.amountMinor ?? 0),
+            id: <span className="cell-code">{s.id.slice(0, 8)}</span>,
+            ref: <span className="font-mono text-xs">{s.paymentReference || '—'}</span>,
+            amount: <span className="cell-money">{formatMoney(s.amountMinor ?? 0)}</span>,
             status: <Badge variant="outline">{s.status}</Badge>,
-            created: formatDate(s.createdAt),
+            created: <span className="whitespace-nowrap text-muted-foreground">{formatDate(s.createdAt)}</span>,
           }))}
         />
       )}
